@@ -2,9 +2,11 @@
 bilinear perspective warp, fiducial-square detection."""
 from __future__ import annotations
 
+import itertools
+from collections import deque
+
 import numpy as np
 from PIL import Image
-from collections import deque
 
 
 class IngestError(Exception):
@@ -96,9 +98,21 @@ def find_fiducials(img: Image.Image) -> list[tuple[int, int]]:
         if area < 1500:                # at least a solid 45x45-ish blob
             continue
         hits.append(((minx + maxx) // 2, (miny + maxy) // 2))
-    if len(hits) != 4:
+    if len(hits) < 4:
         raise IngestError(
             f"expected 4 fiducial markers, found {len(hits)}")
+    if len(hits) > 4:
+        # content blobs can pass the square filter (drawn dots etc.); the
+        # true fiducials are the 4 spanning the whole sheet — pick the
+        # candidate quadruple with the largest bounding-box area
+        best4, best_area = None, -1.0
+        for combo in itertools.combinations(hits, 4):
+            xs = [p[0] for p in combo]
+            ys = [p[1] for p in combo]
+            area = (max(xs) - min(xs)) * (max(ys) - min(ys))
+            if area > best_area:
+                best_area, best4 = area, combo
+        hits = list(best4)
     hits.sort(key=lambda p: (p[1], p[0]))
     tl, tr = sorted(hits[:2], key=lambda p: p[0])
     bl, br = sorted(hits[2:], key=lambda p: p[0])
