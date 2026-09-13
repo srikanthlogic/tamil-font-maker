@@ -36,7 +36,7 @@ template → ingest (digital | paper | extract) → trace → build → verify
 - **B1** digital sheets → font: 296/296 traced, 270/270 GSUB rules, shaping
   identities green, per-glyph IoU (mean ≥ 0.82, none broken).
 - **B2** the same sheets as synthesized phone photos (perspective ≤ ~70 px
-  corner jitter, rotation, noise, uneven light) → fiducial deskew recovers
+  corner jitter, noise, uneven light) → fiducial deskew recovers
   everything.
 - **B3** glyphs on poster-like backgrounds → agent-vision extract (ground
   truth injected), occluded glyph flagged, partial font builds and degrades

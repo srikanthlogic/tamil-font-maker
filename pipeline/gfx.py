@@ -6,10 +6,21 @@ Binary convention everywhere: ink = 255, background = 0, mode "L".
 """
 from __future__ import annotations
 
+from functools import lru_cache
+
 import numpy as np
 from PIL import Image, ImageDraw
 
 # --- shaping -----------------------------------------------------------------
+
+
+@lru_cache(maxsize=8)
+def _open_font(font_path: str) -> tuple[bytes, object]:
+    """font_bytes for uharfbuzz + parsed TTFont for outline access, cached —
+    verify renders hundreds of texts from the same font."""
+    from fontTools.ttLib import TTFont
+
+    return open(font_path, "rb").read(), TTFont(font_path)
 
 
 def shape_text(font_bytes: bytes, text: str, features: dict | None = None) -> list[tuple[int, int, int]]:
@@ -123,10 +134,7 @@ def render_text(font_path: str, text: str, px: int, pad: int = 8) -> Image.Image
     """Render shaped text as ink=255 image. Canvas covers the shaped glyphs'
     ACTUAL ink extents (glyf yMax/yMin) — hhea ascent alone would clip
     glyphs whose art rises above it (common in extracted title fonts)."""
-    from fontTools.ttLib import TTFont
-
-    font_bytes = open(font_path, "rb").read()
-    tt = TTFont(font_path)
+    font_bytes, tt = _open_font(str(font_path))
     shaped = shape_text(font_bytes, text)
     upm = tt["head"].unitsPerEm
     scale = px / upm
@@ -148,6 +156,22 @@ def render_text(font_path: str, text: str, px: int, pad: int = 8) -> Image.Image
     h = int((max(ascent, y_max) - min(descent, y_min)) * scale) + 2 * pad
     return rasterize_glyphs(tt, shaped, px, (max(w, 2), max(h, 2)),
                             (pad, pad + max(ascent, y_max) * scale))
+
+
+def render_ref(font_path: str, text: str, px: int = 300) -> Image.Image:
+    """Reference render for one cell's text. A LONE combining mark is rendered
+    outline-directly — shaping it would get HarfBuzz's dotted circle."""
+    if len(text) == 1 and 0x0BBE <= ord(text) <= 0x0BCD:
+        _, tt = _open_font(str(font_path))
+        name = tt.getBestCmap()[ord(text)]
+        gid = tt.getGlyphOrder().index(name)
+        upm = tt["head"].unitsPerEm
+        asc, desc = tt["hhea"].ascent, tt["hhea"].descent
+        canvas = (int((asc - desc) * px / upm) + 40,
+                  int((asc - desc) * px / upm) + 40)
+        return rasterize_glyphs(tt, [(gid, 0, 0)], px, canvas,
+                                (20, 20 + asc * px / upm))
+    return render_text(font_path, text, px)
 
 
 # --- binarization --------------------------------------------------------------
@@ -206,25 +230,3 @@ def despeckle(binary: Image.Image, min_area: int) -> Image.Image:
             for y, x in comp:
                 out[y, x] = True
     return Image.fromarray(np.where(out, 255, 0).astype(np.uint8), mode="L")
-
-
-def fit_to_box(binary: Image.Image, box_wh: tuple[int, int],
-               anchor_baseline_frac: float | None = None,
-               margin: int = 8) -> Image.Image:
-    """Scale a binary glyph crop into the box, optionally seating the ink
-    bottom at anchor_baseline_frac of box height."""
-    a = np.asarray(binary) > 127
-    ys, xs = np.nonzero(a)
-    if ys.size == 0:
-        return Image.new("L", box_wh, 0)
-    crop = binary.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
-    bw, bh = box_wh
-    avail_w, avail_h = bw - 2 * margin, int(bh * 0.8)
-    scale = min(avail_w / crop.width, avail_h / crop.height)
-    nw, nh = max(1, int(crop.width * scale)), max(1, int(crop.height * scale))
-    crop = crop.resize((nw, nh), Image.LANCZOS)
-    out = Image.new("L", box_wh, 0)
-    base_y = int(bh * anchor_baseline_frac) if anchor_baseline_frac else \
-        (bh + nh) // 2
-    out.paste(crop, ((bw - nw) // 2, max(0, base_y - nh)))
-    return out

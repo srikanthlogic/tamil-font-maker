@@ -10,6 +10,7 @@ import potrace
 from cu2qu import curve_to_quadratic
 from PIL import Image
 
+from .config import cell_params, load as load_config
 from .ingest import BASELINE_IN_RASTER
 from .template import BASELINE_Y, HEADLINE_Y
 
@@ -18,6 +19,8 @@ EM_ASCENT = 1400                       # units from baseline to headline (2048 u
 SCALE = EM_ASCENT / GUIDE_PX           # em units per pixel
 CU2QU_ERR = 2.0                        # ~0.5 px in em units (finer quad fit)
 RSB_FLOOR = 80
+TURDSIZE = 4                           # suppress speckles up to this area
+ALPHAMAX = 0.8                         # potrace corner smoothing
 
 
 def _pt(p):
@@ -80,8 +83,8 @@ def _reverse(c):
     c["poly"] = list(reversed(c["poly"]))
 
 
-def trace_glyph_raster(arr: np.ndarray, turdsize: int = 4,
-                       alphamax: float = 0.8) -> dict:
+def trace_glyph_raster(arr: np.ndarray, turdsize: int = TURDSIZE,
+                       alphamax: float = ALPHAMAX) -> dict:
     """arr: L-mode raster (ink=255). Returns contours with quadratic segs.
 
     Note: potracer traces the *background* of the array it is given, so the
@@ -135,11 +138,20 @@ def trace(project: Path, glyphs_dir: Path | None = None) -> dict:
     glyphs = Path(glyphs_dir) if glyphs_dir else project / "glyphs"
     outlines = project / "outlines"
     outlines.mkdir(exist_ok=True)
+    # validate [cells.<gid>] overrides before any work: a typo'd key must
+    # raise, not dissolve into per-cell isolation
+    config = load_config(project)
+    pngs = sorted(glyphs.glob("g_*.png"))
+    params_by_gid = {p.stem: cell_params(config, p.stem) for p in pngs}
+    params_by_gid = {g: p for g, p in params_by_gid.items() if p}
     traced, failed = [], []
-    for png in sorted(glyphs.glob("g_*.png")):
+    for png in pngs:
+        params = params_by_gid.get(png.stem, {})
         try:
             arr = np.asarray(Image.open(png).convert("L"))
-            result = trace_glyph_raster(arr)
+            result = trace_glyph_raster(
+                arr, turdsize=params.get("despeckle", TURDSIZE),
+                alphamax=params.get("smooth", ALPHAMAX))
             if not result["contours"]:
                 failed.append({"gid": png.stem, "reason": "no contours"})
                 continue
@@ -147,4 +159,7 @@ def trace(project: Path, glyphs_dir: Path | None = None) -> dict:
             traced.append(png.stem)
         except Exception as exc:  # noqa: BLE001 — per-cell isolation by design
             failed.append({"gid": png.stem, "reason": repr(exc)})
-    return {"traced": len(traced), "gids": traced, "failed": failed}
+    report = {"traced": len(traced), "gids": traced, "failed": failed}
+    if params_by_gid:
+        report["overrides"] = params_by_gid
+    return report

@@ -4,13 +4,13 @@ ground truth, one glyph occluded (flagged unextractable), partial font
 builds with graceful degradation and a completion template."""
 import numpy as np
 import pytest
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from pipeline import build as build_mod
 from pipeline import ingest, template, trace, verify as verify_mod
 from pipeline.gfx import render_text, shape_text
 from pipeline.mapping import cell
-from test_b1 import _norm_iou, _ref_render
+from bootstrap import norm_iou, ref_render
 
 pytestmark = pytest.mark.slow
 
@@ -22,8 +22,6 @@ SELECT = ["g_u0B85", "g_u0B95", "g_u0BAE", "g_u0BBF", "g_u0BBE", "g_u0BC1",
           "g_u0BAE_u0BC1", "g_u0BE7", "g_u0035", "g_u0021", "g_u0B83"]
 OCCLUDED = "g_u0BB5"
 OCCLUDED_TEXT = "வ"
-
-FONT = "test/fixtures/NotoSansTamil.ttf"
 
 
 def _poster_background(w, h, seed):
@@ -46,18 +44,16 @@ def _poster_background(w, h, seed):
 def _poster_text_glyph(gid, seed):
     c = cell(gid)
     text = "".join(chr(cp) for cp in c.cps)
-    ref = _ref_render(text, 300)
+    ref = ref_render(text, 300)
     arr = np.array(ref) > 127
     ys, xs = np.nonzero(arr)
     ref = ref.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
     pad = 60
     bg = _poster_background(ref.width + 2 * pad, ref.height + 2 * pad, seed)
     ink_val = 25
-    bg[ref.height // 1: ref.height, :, :]  # no-op keep shape
     mask = np.array(ref) > 127
     bg[pad:pad + ref.height, pad:pad + ref.width][mask] = ink_val
     if gid == OCCLUDED:
-        d = ImageDraw.Draw(Image.new("L", (1, 1)))  # placeholder, real draw below
         oc = np.zeros(bg.shape[:2], dtype=bool)
         yy, xx = np.mgrid[0:bg.shape[0], 0:bg.shape[1]]
         cx, cy = pad + ref.width // 2, pad + ref.height // 2
@@ -108,7 +104,7 @@ def test_b3_extract(tmp_path):
         c = cell(gid)
         text = "".join(chr(cp) for cp in c.cps)
         got = render_text(str(font_path), text, 300)
-        iou = _norm_iou(got, refs[gid])
+        iou = norm_iou(got, refs[gid])
         if iou < 0.6:
             worst.append((gid, round(iou, 3)))
     assert not worst, f"extracted glyphs below IoU 0.6: {worst}"

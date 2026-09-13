@@ -1,7 +1,7 @@
 """Single source of truth for the Tamil glyph set (spec §4).
 
 Every other stage derives from this table; nothing else hardcodes Tamil.
-Counts (locked by test_mapping.py): 296 cells, 306 GSUB ligature rules.
+Counts (locked by test_mapping.py): 296 cells, 270 GSUB ligature rules.
 """
 from dataclasses import dataclass
 

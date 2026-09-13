@@ -10,15 +10,10 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from .gfx import render_text
-from .mapping import CELLS, ligature_rules
+from .mapping import CELLS, SAMPLE_TEXTS, ligature_rules
 
 EM_MIN, EM_MAX = -600, 2600     # generous em-box bounds (guides: 0..1400)
 CHART_PX = 96
-SAMPLE_TEXTS = [
-    "தமிழ் எழுத்துக் கலை.",
-    "ஆண்டு 2026 ஆகும்.",
-    "ஃஜஷஸஹ (க-ன்) ௦௧௨௩",
-]
 
 
 def _font_path(project: Path) -> Path:

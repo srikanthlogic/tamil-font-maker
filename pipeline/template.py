@@ -38,7 +38,7 @@ def sheet_cells() -> dict[str, list[Cell]]:
     return out
 
 
-def cell_box(sheet: str, row: int, col: int) -> tuple[int, int, int, int]:
+def cell_box(row: int, col: int) -> tuple[int, int, int, int]:
     x0 = MARGIN_X + col * (CELL_W + GAP_X)
     y0 = MARGIN_Y + row * (CELL_H + GAP_H)
     return x0, y0, x0 + CELL_W, y0 + CELL_H
@@ -53,9 +53,9 @@ def _draw_fiducials(draw: ImageDraw.ImageDraw):
                         cx + FID_BLACK // 2, cy + FID_BLACK // 2], fill=0)
 
 
-def _draw_cell(draw: ImageDraw.ImageDraw, cell_item: Cell, sheet: str,
+def _draw_cell(draw: ImageDraw.ImageDraw, cell_item: Cell,
                row: int, col: int):
-    x0, y0, x1, y1 = cell_box(sheet, row, col)
+    x0, y0, x1, y1 = cell_box(row, col)
     draw.rectangle([x0, y0, x1, y1], outline=120, width=2)
     draw.line([x0 + 4, y0 + HEADLINE_Y, x1 - 4, y0 + HEADLINE_Y], fill=200, width=2)
     draw.line([x0 + 4, y0 + BASELINE_Y, x1 - 4, y0 + BASELINE_Y], fill=200, width=2)
@@ -68,10 +68,6 @@ def _new_sheet() -> Image.Image:
     img = Image.new("L", (SHEET_W, SHEET_H), 255)
     _draw_fiducials(ImageDraw.Draw(img))
     return img
-
-
-def _label_of(c: Cell) -> str:
-    return c.gid
 
 
 def generate(sheets_dir: Path, only: set[str] | None = None) -> dict:
@@ -102,7 +98,7 @@ def generate(sheets_dir: Path, only: set[str] | None = None) -> dict:
                 row, col = cell_item.row, cell_item.col
             else:
                 row, col = divmod(idx, CELL_COLS)
-            _draw_cell(draw, cell_item, sheet_name, row, col)
+            _draw_cell(draw, cell_item, row, col)
             placed += 1
         draw.text((SHEET_W // 2 - 60, SHEET_H - 60), sheet_name, fill=0,
                   font=_label_font(30))

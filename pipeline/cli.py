@@ -11,10 +11,6 @@ from pathlib import Path
 
 from . import backfill, build, ingest, template, trace, verify
 
-STAGE_REPORTS = {"template": "template.json", "ingest": None, "trace": "trace.json",
-                 "build": "build.json", "verify": "verify.json"}
-
-
 def _save_report(project: Path, name: str, report: dict) -> None:
     rdir = Path(project) / "reports"
     rdir.mkdir(exist_ok=True)

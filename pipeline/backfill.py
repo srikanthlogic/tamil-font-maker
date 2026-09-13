@@ -9,27 +9,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .gfx import rasterize_glyphs, render_text
+from .gfx import render_ref
 from .ingest import BASELINE_IN_RASTER, HEADLINE_IN_RASTER, WORK_H, WORK_W, _record
 from .mapping import CELLS
-
-
-def _ref_render(font_path: str, text: str, px: int = 300) -> Image.Image:
-    """Shaped render; lone combining marks render outline-directly (a shaped
-    single mark would get HarfBuzz's dotted circle)."""
-    from fontTools.ttLib import TTFont
-
-    if len(text) == 1 and 0x0BBE <= ord(text) <= 0x0BCD:
-        tt = TTFont(font_path)
-        glyph_set = tt.getGlyphSet()
-        name = tt.getBestCmap()[ord(text)]
-        gid = tt.getGlyphOrder().index(name)
-        upm = tt["head"].unitsPerEm
-        asc, desc = tt["hhea"].ascent, tt["hhea"].descent
-        canvas = (int((asc - desc) * px / upm) + 40, int((asc - desc) * px / upm) + 40)
-        return rasterize_glyphs(tt, [(gid, 0, 0)], px, canvas,
-                                (20, 20 + asc * px / upm))
-    return render_text(font_path, text, px)
 
 
 def backfill(project: Path, font_path: str, px: int = 300,
@@ -37,7 +19,7 @@ def backfill(project: Path, font_path: str, px: int = 300,
     project = Path(project)
     glyphs = Path(glyphs_dir) if glyphs_dir else project / "glyphs"
     glyphs.mkdir(exist_ok=True)
-    filled, backfilled, failed = 0, [], []
+    filled, backfilled, failed, synthetic_dot = 0, [], [], []
     for c in CELLS:
         out = glyphs / f"{c.gid}.png"
         if out.exists():
@@ -45,13 +27,16 @@ def backfill(project: Path, font_path: str, px: int = 300,
             continue
         try:
             text = "".join(chr(cp) for cp in c.cps)
-            ref = _ref_render(font_path, text, px)
+            ref = render_ref(font_path, text, px)
             a = np.array(ref) > 127
             if not a.any() and c.cps[-1] == 0x0BCD:
+                # base font's standalone pulli glyph is empty by design;
+                # substitute a programmatic dot and SAY SO in the report
                 ref = Image.new("L", (200, 200), 0)
                 from PIL import ImageDraw
                 ImageDraw.Draw(ref).ellipse([76, 76, 124, 124], fill=255)
                 a = np.array(ref) > 127
+                synthetic_dot.append(c.gid)
             if not a.any():
                 failed.append({"gid": c.gid, "reason": "empty render"})
                 continue
@@ -76,4 +61,5 @@ def backfill(project: Path, font_path: str, px: int = 300,
         except Exception as exc:  # noqa: BLE001 — per-cell isolation
             failed.append({"gid": c.gid, "reason": repr(exc)})
     return {"backfilled": len(backfilled), "already_present": filled,
-            "failed": failed, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            "failed": failed, "synthetic_dot": synthetic_dot,
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}

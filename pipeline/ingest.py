@@ -13,10 +13,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .gfx import despeckle, fit_to_box, otsu
+from .config import cell_params, load as load_config
+from .gfx import despeckle, otsu
 from .homography import IngestError, find_fiducials, solve_homography, warp_perspective
-from .template import (BASELINE_Y, CELL_H, CELL_W, FID_C, HEADLINE_Y,
-                       SHEET_H, SHEET_W, sheet_cells)
+from .template import (BASELINE_Y, CELL_COLS, CELL_H, CELL_W, FID_C,
+                       HEADLINE_Y, SHEET_H, SHEET_W, cell_box, sheet_cells)
 
 WORK_INSET = 20
 WORK_W = CELL_W - 2 * WORK_INSET          # 360
@@ -80,20 +81,21 @@ def _sheet_cells_for(sheet: str, sheets_dir: Path) -> list[str]:
     return [c.gid for c in sc[sheet]]
 
 
-def _extract_cells(sheet_img: Image.Image, gids: list[str], threshold: int):
-    """Inner-crop each cell, binarize, drop empties. -> (artifacts, empty, low)"""
-    from .template import GAP_H, GAP_X, MARGIN_X, MARGIN_Y
+def _extract_cells(sheet_img: Image.Image, gids: list[str], threshold: int,
+                   overrides: dict[str, dict] | None = None):
+    """Inner-crop each cell, binarize, drop empties. -> (artifacts, empty, low)
 
+    A per-cell `threshold` override ([cells.<gid>] in config.toml) wins over
+    the mode default."""
     artifacts, empty, low = {}, [], []
     for i, gid in enumerate(gids):
-        row, col = divmod(i, 5)
-        bx0 = MARGIN_X + col * (CELL_W + GAP_X)
-        by0 = MARGIN_Y + row * (CELL_H + GAP_H)
-        crop = sheet_img.crop((bx0 + WORK_INSET, by0 + WORK_INSET,
-                               bx0 + CELL_W - WORK_INSET,
-                               by0 + CELL_H - WORK_INSET))
+        row, col = divmod(i, CELL_COLS)
+        x0, y0, x1, y1 = cell_box(row, col)
+        crop = sheet_img.crop((x0 + WORK_INSET, y0 + WORK_INSET,
+                               x1 - WORK_INSET, y1 - WORK_INSET))
         a = np.asarray(crop)
-        ink = a < threshold            # dark strokes on light cell
+        th = (overrides or {}).get(gid, {}).get("threshold", threshold)
+        ink = a < th            # dark strokes on light cell
         frac = ink.mean()
         if frac < EMPTY_INK_FRAC:
             empty.append(gid)
@@ -114,13 +116,20 @@ def _threshold_for(img: Image.Image, fixed: int | None,
 
 
 def _store(glyphs_dir: Path, artifacts: dict, empty: list, low: list,
-           mode: str, source: str, preset: str | None) -> dict:
+           mode: str, source: str, preset: str | None,
+           params_by_gid: dict[str, dict] | None = None) -> dict:
     for gid, img in artifacts.items():
+        entry = {"source": source, "mode": mode, "preset": preset}
+        params = (params_by_gid or {}).get(gid)
+        if params:
+            entry["params"] = params
         img.save(glyphs_dir / f"{gid}.png")
-        _record(glyphs_dir, gid, {"source": source, "mode": mode,
-                                  "preset": preset})
-    return {"ingested_gids": sorted(artifacts), "empty": empty,
-            "low_ink": low, "mode": mode}
+        _record(glyphs_dir, gid, entry)
+    report = {"ingested_gids": sorted(artifacts), "empty": empty,
+              "low_ink": low, "mode": mode}
+    if params_by_gid:
+        report["param_overrides"] = sorted(params_by_gid)
+    return report
 
 
 # --- the three modes ------------------------------------------------------------
@@ -134,9 +143,11 @@ def ingest_digital(project: Path, sheet_path: Path, glyphs_dir: Path | None = No
             f"digital sheet must be unmodified template: {img.size} != "
             f"{(SHEET_W, SHEET_H)}")
     gids = _sheet_cells_for(sheet_path.stem, Path(project) / "sheets")
-    artifacts, empty, low = _extract_cells(img, gids, DIGITAL_THRESHOLD)
+    config = load_config(project)
+    params = {g: p for g in gids if (p := cell_params(config, g))}
+    artifacts, empty, low = _extract_cells(img, gids, DIGITAL_THRESHOLD, params)
     return _store(_glyphs_dir(project, glyphs_dir), artifacts, empty, low,
-                  "digital", str(sheet_path.name), None)
+                  "digital", str(sheet_path.name), None, params)
 
 
 def ingest_paper(project: Path, photo_path: Path, sheet: str,
@@ -148,9 +159,12 @@ def ingest_paper(project: Path, photo_path: Path, sheet: str,
     H = solve_homography(corners, target)
     warped = warp_perspective(photo, H, (SHEET_W, SHEET_H))
     gids = _sheet_cells_for(sheet, Path(project) / "sheets")
-    artifacts, empty, low = _extract_cells(warped, gids, _threshold_for(warped, None))
+    config = load_config(project)
+    params = {g: p for g in gids if (p := cell_params(config, g))}
+    artifacts, empty, low = _extract_cells(
+        warped, gids, _threshold_for(warped, None), params)
     return _store(_glyphs_dir(project, glyphs_dir), artifacts, empty, low,
-                  "paper", Path(photo_path).name, None)
+                  "paper", Path(photo_path).name, None, params)
 
 
 _PRESETS = {
@@ -165,12 +179,17 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
     if preset not in _PRESETS:
         raise IngestError(f"unknown preset {preset!r}")
     glyphs_dir = _glyphs_dir(project, glyphs_dir)
+    config = load_config(project)
     cleaned: dict[str, Image.Image] = {}
+    params_by_gid: dict[str, dict] = {}
     for gid, path in crops.items():
+        params = cell_params(config, gid)
+        if params:
+            params_by_gid[gid] = params
         img = Image.open(Path(path)).convert("L")
         # no OTSU clamp here: extract crops have no template guides, and the
         # clamp would admit mid-gray background as ink
-        t = _threshold_for(img, None, clamp=None)
+        t = _threshold_for(img, params.get("threshold"), clamp=None)
         a = np.asarray(img)
         # polarity auto-detect: posters carry light lettering on dark ground
         # as often as the reverse. Background always touches the crop borders
@@ -186,7 +205,9 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
         polarity = dark if _border_contact(dark) <= _border_contact(light) \
             else light
         binary = Image.fromarray(np.where(polarity, 255, 0).astype(np.uint8), "L")
-        binary = despeckle(binary, min_area=_PRESETS[preset]["min_area"])
+        binary = despeckle(
+            binary, min_area=params.get("despeckle",
+                                        _PRESETS[preset]["min_area"]))
         cleaned[gid] = binary
 
     # No batch size normalization here: natural letter heights DIFFER
@@ -233,9 +254,8 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
             s = target / ink.height
             ink = ink.resize((max(1, int(ink.width * s)),
                               max(1, int(ink.height * s))), Image.LANCZOS)
-        # place like backfill does: baseline-anchored paste, NO upscale —
-        # fit_to_box would blow small crops up to raster height and break
-        # the body match
+        # place like backfill does: baseline-anchored paste, NO upscaling —
+        # filling the raster height would break the body match
         max_h, max_w = int(WORK_H * 0.92), WORK_W - 8
         if ink.height > max_h or ink.width > max_w:
             s2 = min(max_h / ink.height, max_w / ink.width)
@@ -256,5 +276,6 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
         if frac < LOW_INK_FRAC:
             low.append(gid)
         artifacts[gid] = raster
-    report = _store(glyphs_dir, artifacts, empty, low, "extract", "", preset)
+    report = _store(glyphs_dir, artifacts, empty, low, "extract", "", preset,
+                    params_by_gid)
     return report

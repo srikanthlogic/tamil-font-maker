@@ -37,7 +37,7 @@ def test_sheet_geometry(sheets_dir):
 def test_cell_guides_and_labels(sheets_dir):
     d, _ = sheets_dir
     img = np.array(__import__("PIL.Image", fromlist=["Image"]).open(d / "S1.png"))
-    x0, y0, x1, y1 = cell_box("S1", 0, 0)
+    x0, y0, x1, y1 = cell_box(0, 0)
     assert (x1 - x0, y1 - y0) == (CELL_W, CELL_H)
     # headline guide (gray) and baseline guide present
     assert img[y0 + HEADLINE_Y, x0 + 50: x0 + 350].mean() < 230
@@ -65,10 +65,10 @@ def test_completion_sheets(tmp_path):
     assert files == ["C1.png"]
     assert report["cells_placed"] == 2
     img = np.array(__import__("PIL.Image", fromlist=["Image"]).open(tmp_path / "C1.png"))
-    x0, y0, x1, y1 = cell_box("C1", 0, 0)
+    x0, y0, x1, y1 = cell_box(0, 0)
     strip = img[y1 + 5: y1 + 40, x0: x1]
     assert (strip < 100).sum() > 30
     # slots (0,0) and (0,1) hold the two cells; slot (1,0) must be empty
-    bx0, by0, bx1, by1 = cell_box("C1", 1, 0)
+    bx0, by0, bx1, by1 = cell_box(1, 0)
     strip2 = img[by1 + 5: by1 + 40, bx0: bx1]
     assert (strip2 < 100).sum() == 0

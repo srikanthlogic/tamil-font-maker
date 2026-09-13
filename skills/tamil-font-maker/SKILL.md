@@ -71,10 +71,16 @@ For arbitrary images with Tamil lettering:
   coverage. A `fail` verdict means fix, not ship.
 - **Read the QA images.** You are the visual judge: look for clipped glyphs,
   baseline drift, matra collisions, mistraces, ink blobs.
-- **Iterate per cell.** Override cleanup/trace parameters in
-  `projects/<name>/config.toml` (`[cells.g_u0BBF]`, keys `threshold`,
-  `despeckle`, `smooth`), re-run the affected stages (stages are idempotent;
-  single cells can be re-ingested). If parameters cannot fix a cell, add it
+- **Iterate per cell.** Put per-cell overrides in `projects/<name>/config.toml`
+  (`[cells.g_u0BBF]`): `threshold` (int — fixed binarization cutoff at
+  ingest, replacing the mode default: digital 190 / paper otsu-clamped /
+  extract unclamped otsu), `despeckle` (int — minimum ink-component area in
+  px, applied by extract cleanup and by trace as `turdsize`, default 4),
+  `smooth` (float — trace `alphamax`, default 0.8). Re-run the affected
+  stages — all stages are idempotent, and in extract mode a single cell
+  re-ingests by passing just its `gid=crop` pair. Applied overrides show up
+  in the stage report and the glyph manifest; unknown keys or types raise an
+  error. If parameters cannot fix a cell, add it
   to a redraw packet: `template projects/<name> --only <gid> …` produces a
   sheet with just those cells for the user to redraw.
 - Converge when programmatic gates pass and every visual flag is either

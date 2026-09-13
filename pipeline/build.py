@@ -12,19 +12,12 @@ from fontTools.feaLib.parser import Parser
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
+from .config import load as load_config
 from .mapping import CELLS, UPM, ligature_rules
 
 ASCENT, DESCENT = 1500, -500
 SPACE_ADVANCE = 160
 DEFAULT_FAMILY = "TamilMaker"
-
-
-def _load_config(project: Path) -> dict:
-    cfg = project / "config.toml"
-    if cfg.exists():
-        import tomllib
-        return tomllib.loads(cfg.read_text())
-    return {}
 
 
 def _glyph_from_outline(data: dict):
@@ -56,7 +49,7 @@ def _fea(rules: list[tuple[tuple[int, ...], str]]) -> str:
 
 def build(project: Path) -> dict:
     project = Path(project)
-    config = _load_config(project)
+    config = load_config(project)
     family = config.get("family", DEFAULT_FAMILY)
     psname = config.get("psname", "".join(
         ch if ch.isalnum() else "" for ch in family) or DEFAULT_FAMILY)

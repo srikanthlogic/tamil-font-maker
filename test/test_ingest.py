@@ -1,26 +1,26 @@
-"""Tests for pipeline.ingest — digital, paper, extract, re-ingest."""
+"""Tests for pipeline.ingest — digital, paper, extract, re-ingest, errors."""
 import numpy as np
 import pytest
-from PIL import Image, ImageDraw
+from PIL import Image
 
+from bootstrap import FIX_FONT, synthesize_photo
 from pipeline.gfx import render_text
+from pipeline.homography import IngestError
 from pipeline.ingest import (ingest_digital, ingest_extract, ingest_paper,
                              manifest_of)
-from pipeline.template import cell_box, generate
-
-FIX_FONT = "test/fixtures/NotoSansTamil.ttf"
+from pipeline.template import BASELINE_Y, cell_box, generate
 
 
-def _fill_cell(sheet_img: Image.Image, sheet: str, row: int, col: int, char: str):
+def _fill_cell(sheet_img: Image.Image, row: int, col: int, char: str):
     """Paste a rendered Tamil glyph into a cell's inner drawing area."""
-    x0, y0, x1, y1 = cell_box(sheet, row, col)
+    x0, y0, x1, y1 = cell_box(row, col)
     glyph = render_text(FIX_FONT, char, 300)
     a = np.array(glyph) > 127
     ys, xs = np.nonzero(a)
     glyph = glyph.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
-    # seat the ink bottom on the baseline (y0 + 420), centered
-    px = x0 + (CELL_W_PX := x1 - x0 - glyph.width) // 2
-    py = y0 + 420 - glyph.height
+    # seat the ink bottom on the baseline, centered
+    px = x0 + (x1 - x0 - glyph.width) // 2
+    py = y0 + BASELINE_Y - glyph.height
     sheet_img.paste(0, (px, py, px + glyph.width, py + glyph.height),
                     mask=Image.fromarray(np.array(glyph)))
 
@@ -32,9 +32,9 @@ def filled_s1(tmp_path_factory):
     sheets = d / "sheets"
     generate(sheets)
     img = Image.open(sheets / "S1.png").convert("L")
-    _fill_cell(img, "S1", 0, 0, "அ")
-    _fill_cell(img, "S1", 0, 1, "ஆ")
-    _fill_cell(img, "S1", 2, 2, "ஃ")   # ஃ is the 13th cell: row 2, col 2
+    _fill_cell(img, 0, 0, "அ")
+    _fill_cell(img, 0, 1, "ஆ")
+    _fill_cell(img, 2, 2, "ஃ")   # ஃ is the 13th cell: row 2, col 2
     img.save(sheets / "S1.png")
     return d, sheets / "S1.png"
 
@@ -61,7 +61,7 @@ def _cells_of(sheet):
 def test_ingest_paper_recovers_cells(filled_s1, tmp_path):
     proj, sheet = filled_s1
     out = tmp_path / "photo.png"
-    _synthesize_photo(sheet, out, seed=7)
+    synthesize_photo(sheet, out, seed=7)
     paper_glyphs = proj / "glyphs_paper"
     report = ingest_paper(proj, out, sheet="S1", glyphs_dir=paper_glyphs)
     assert set(report["ingested_gids"]) == {"g_u0B85", "g_u0B86", "g_u0B83"}
@@ -72,32 +72,6 @@ def test_ingest_paper_recovers_cells(filled_s1, tmp_path):
         inter = (a & b).sum()
         union = (a | b).sum()
         assert union and inter / union > 0.7, f"{gid} IoU too low"
-
-
-def _synthesize_photo(sheet_png, out_path, seed):
-    """Simulate a phone photo: perspective + uneven light + noise."""
-    from pipeline.homography import solve_homography, warp_perspective
-    from pipeline.template import SHEET_H, SHEET_W
-
-    rng = np.random.default_rng(seed)
-    img = Image.open(sheet_png).convert("L")
-    src = [(0, 0), (SHEET_W, 0), (SHEET_W, SHEET_H), (0, SHEET_H)]
-    j = 70
-    # all four corners pushed outward, kept safely inside the canvas
-    dst = [(int(j * rng.uniform(0.5, 1.0)), int(j * rng.uniform(0.5, 1.0))),
-           (SHEET_W + int(j * rng.uniform(0.5, 1.0)), int(j * rng.uniform(0.1, 0.8))),
-           (SHEET_W + int(j * rng.uniform(0.5, 1.0)), SHEET_H + int(j * rng.uniform(0.5, 1.0))),
-           (int(j * rng.uniform(0.1, 0.6)), SHEET_H + int(j * rng.uniform(0.3, 0.9)))]
-    H = solve_homography(src, dst)
-    warped = warp_perspective(img, H, (SHEET_W + 2 * j, SHEET_H + 2 * j))
-    a = np.array(warped).astype(np.float32)
-    # uneven illumination: radial gradient
-    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
-    light = 225 - 60 * ((xx - a.shape[1] * 0.3) ** 2 + (yy - a.shape[0] * 0.3) ** 2) \
-        / (a.shape[0] ** 2 + a.shape[1] ** 2)
-    a = np.clip(a * (light / 255.0), 0, 255)
-    a = a + rng.normal(0, 6, a.shape)
-    Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(out_path)
 
 
 def test_ingest_extract_cleanup_and_manifest(tmp_path):
@@ -130,3 +104,38 @@ def test_reingest_appends_history(tmp_path):
     m = manifest_of(proj)
     # two ingests -> current entry + one historical entry
     assert len(m["g_u0BAE"]["history"]) == 1
+
+
+def test_reingest_history_capped_at_five(tmp_path):
+    proj = tmp_path
+    (proj / "crops").mkdir()
+    crop = render_text(FIX_FONT, "ம", 300)
+    for i in range(7):
+        p = proj / "crops" / f"m{i}.png"
+        crop.save(p)
+        ingest_extract(proj, {"g_u0BAE": p}, preset="clean")
+    m = manifest_of(proj)
+    # manifest keeps at most the current entry + 5 historical ones
+    assert len(m["g_u0BAE"]["history"]) == 5
+
+
+def test_ingest_digital_rejects_modified_sheet(tmp_path):
+    bad = tmp_path / "bad.png"
+    Image.new("L", (1000, 1400), 255).save(bad)
+    with pytest.raises(IngestError):
+        ingest_digital(tmp_path, bad)
+
+
+def test_ingest_paper_requires_four_fiducials(tmp_path):
+    blank = tmp_path / "blank.png"
+    Image.new("L", (800, 1100), 255).save(blank)
+    with pytest.raises(IngestError):
+        ingest_paper(tmp_path, blank, sheet="S1")
+
+
+def test_ingest_extract_unknown_preset(tmp_path):
+    crop = render_text(FIX_FONT, "க", 300)
+    p = tmp_path / "ka.png"
+    crop.save(p)
+    with pytest.raises(IngestError):
+        ingest_extract(tmp_path, {"g_u0B95": p}, preset="nope")
