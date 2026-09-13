@@ -58,7 +58,9 @@ def cmd_ingest_extract(args) -> dict:
         if not path:
             raise SystemExit(f"crops must be gid=path, got {pair!r}")
         crops[gid] = Path(path)
-    report = ingest.ingest_extract(Path(args.project), crops, preset=args.preset)
+    report = ingest.ingest_extract(Path(args.project), crops,
+                                   preset=args.preset,
+                                   scale_to_body=not args.no_scale_to_body)
     _save_report(args.project, "ingest_extract.json", report)
     return report
 
@@ -116,6 +118,10 @@ def main(argv=None):
     s.add_argument("project")
     s.add_argument("crops", nargs="+", metavar="gid=path")
     s.add_argument("--preset", default="faithful", choices=["faithful", "clean"])
+    s.add_argument("--no-scale-to-body", action="store_true",
+                   help="keep extracted letters at crop scale (default: "
+                        "scale to match backfilled body letters; run "
+                        "backfill first)")
     s.set_defaults(fn=cmd_ingest_extract)
 
     s = sub.add_parser("backfill")

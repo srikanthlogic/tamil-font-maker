@@ -90,7 +90,9 @@ def build(project: Path) -> dict:
                        "fullName": f"{family} Regular",
                        "psName": f"{psname}-Regular"})
     fb.setupOS2(sTypoAscender=ASCENT, sTypoDescender=DESCENT,
-                usWinAscent=ASCENT, usWinDescent=-DESCENT)
+                usWinAscent=2000, usWinDescent=800)  # win must cover full ink:
+    # extracted title art can rise above the typo ascent, and some Windows
+    # renderers clip at usWinAscent
     fb.setupPost()
 
     # GSUB: only rules whose precomposed glyph (and sequence members) exist

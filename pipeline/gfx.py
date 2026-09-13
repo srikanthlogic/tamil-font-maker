@@ -120,7 +120,9 @@ def rasterize_glyphs(ttfont, shaped, px: int, canvas: tuple[int, int],
 
 
 def render_text(font_path: str, text: str, px: int, pad: int = 8) -> Image.Image:
-    """Render shaped text as ink=255 image, baseline-derived canvas sizing."""
+    """Render shaped text as ink=255 image. Canvas covers the shaped glyphs'
+    ACTUAL ink extents (glyf yMax/yMin) — hhea ascent alone would clip
+    glyphs whose art rises above it (common in extracted title fonts)."""
     from fontTools.ttLib import TTFont
 
     font_bytes = open(font_path, "rb").read()
@@ -132,15 +134,20 @@ def render_text(font_path: str, text: str, px: int, pad: int = 8) -> Image.Image
     descent = tt["hhea"].descent  # negative
     order = tt.getGlyphOrder()
     hmtx = tt["hmtx"]
+    glyf = tt["glyf"]
     if shaped:
         last_gid, last_x, _ = shaped[-1]
         width = last_x + hmtx[order[last_gid]][0]
+        y_max = max(glyf[order[g]].yMax + dy for g, _, dy in shaped
+                    if glyf[order[g]].numberOfContours != 0) if shaped else ascent
+        y_min = min(glyf[order[g]].yMin + dy for g, _, dy in shaped
+                    if glyf[order[g]].numberOfContours != 0)
     else:
-        width = 0
+        width, y_max, y_min = 0, ascent, descent
     w = int(width * scale) + 2 * pad
-    h = int((ascent - descent) * scale) + 2 * pad
+    h = int((max(ascent, y_max) - min(descent, y_min)) * scale) + 2 * pad
     return rasterize_glyphs(tt, shaped, px, (max(w, 2), max(h, 2)),
-                            (pad, pad + ascent * scale))
+                            (pad, pad + max(ascent, y_max) * scale))
 
 
 # --- binarization --------------------------------------------------------------

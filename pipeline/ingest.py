@@ -160,7 +160,8 @@ _PRESETS = {
 
 
 def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
-                   glyphs_dir: Path | None = None) -> dict:
+                   glyphs_dir: Path | None = None,
+                   scale_to_body: bool = True) -> dict:
     if preset not in _PRESETS:
         raise IngestError(f"unknown preset {preset!r}")
     glyphs_dir = _glyphs_dir(project, glyphs_dir)
@@ -192,6 +193,30 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
     # (ஃ is short, combos tall) and forcing a median distorts them. Size
     # consistency is the crop stage's job — cut equal-height boxes for
     # letters that share an optical height.
+    #
+    # One scale correction IS wanted: match the body. Extracted letters
+    # otherwise land ~1.4x taller than the backfilled body text (their crops
+    # get upscaled to fill the working raster), which reads as slop the
+    # moment title letters are typed inside a sentence. Reference height =
+    # median ink height of already-present uyir/consonant glyphs (i.e. run
+    # `backfill` BEFORE `ingest-extract`).
+    target_body_h = None
+    if scale_to_body:
+        from .mapping import cell as _cell
+        body_heights = []
+        for p in glyphs_dir.glob("g_*.png"):
+            try:
+                if _cell(p.stem).kind not in ("uyir", "consonant"):
+                    continue
+            except KeyError:
+                continue
+            m = np.asarray(Image.open(p)) > 127
+            ys, xs = np.nonzero(m)
+            if ys.size:
+                body_heights.append(int(ys.max() - ys.min() + 1))
+        if len(body_heights) >= 3:
+            target_body_h = float(np.median(body_heights))
+
     artifacts, empty, low = {}, [], []
     for gid in crops:
         binary = cleaned[gid]
@@ -201,11 +226,35 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
             continue
         ys, xs = np.nonzero(m)
         ink = binary.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
-        normalized = fit_to_box(ink, (WORK_W, WORK_H),
-                                anchor_baseline_frac=BASELINE_IN_RASTER / WORK_H)
+        # body-match when a body reference exists (backfill-first workflow);
+        # otherwise just ensure enough resolution for a clean trace
+        target = target_body_h if target_body_h else max(ink.height, 200)
+        if abs(ink.height - target) > 2:
+            s = target / ink.height
+            ink = ink.resize((max(1, int(ink.width * s)),
+                              max(1, int(ink.height * s))), Image.LANCZOS)
+        # place like backfill does: baseline-anchored paste, NO upscale —
+        # fit_to_box would blow small crops up to raster height and break
+        # the body match
+        max_h, max_w = int(WORK_H * 0.92), WORK_W - 8
+        if ink.height > max_h or ink.width > max_w:
+            s2 = min(max_h / ink.height, max_w / ink.width)
+            ink = ink.resize((max(1, int(ink.width * s2)),
+                              max(1, int(ink.height * s2))), Image.LANCZOS)
+        raster = Image.new("L", (WORK_W, WORK_H), 0)
+        from .mapping import cell as _cell
+        bottom = BASELINE_IN_RASTER
+        try:
+            if _cell(gid).kind == "sign":
+                bottom = HEADLINE_IN_RASTER + 80
+        except KeyError:
+            pass
+        px = (WORK_W - ink.width) // 2
+        py = max(4, bottom - ink.height)
+        raster.paste(255, (px, py, px + ink.width, py + ink.height), mask=ink)
         frac = m.mean()
         if frac < LOW_INK_FRAC:
             low.append(gid)
-        artifacts[gid] = normalized
+        artifacts[gid] = raster
     report = _store(glyphs_dir, artifacts, empty, low, "extract", "", preset)
     return report
