@@ -150,24 +150,21 @@ def otsu(gray: Image.Image) -> int:
     a = np.asarray(gray.convert("L")).ravel()
     hist = np.bincount(a, minlength=256).astype(np.float64)
     total = a.size
-    sum_all = np.dot(np.arange(256), hist)
-    sum_b = 0.0
-    w_b = 0.0
-    best_t, best_var = 127, -1.0
-    for t in range(256):
-        w_b += hist[t]
-        if w_b == 0:
-            continue
-        w_f = total - w_b
-        if w_f == 0:
-            break
-        sum_b += t * hist[t]
-        m_b = sum_b / w_b
-        m_f = (sum_all - sum_b) / w_f
-        var = w_b * w_f * (m_b - m_f) ** 2
-        if var > best_var:
-            best_var, best_t = var, t
-    return best_t
+    levels = np.arange(256, dtype=np.float64)
+    sum_all = np.dot(levels, hist)
+    w_b = np.cumsum(hist)
+    sum_b = np.cumsum(levels * hist)
+    valid = w_b > 0
+    w_f = total - w_b
+    with np.errstate(divide="ignore", invalid="ignore"):
+        m_b = np.where(w_b > 0, sum_b / np.maximum(w_b, 1), 0)
+        m_f = np.where(w_f > 0, (sum_all - sum_b) / np.maximum(w_f, 1), 0)
+    var = np.where(valid & (w_f > 0), w_b * w_f * (m_b - m_f) ** 2, -1.0)
+    best = var.max()
+    plateau = np.nonzero(var >= best * (1 - 1e-9))[0]
+    # any threshold on the plateau partitions identically; the median is the
+    # most robust representative for degenerate (pure-bimodal) images
+    return int(np.median(plateau))
 
 
 def otsu_binarize(img: Image.Image) -> Image.Image:

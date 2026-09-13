@@ -2,6 +2,7 @@
 5x5 grids, in-cell guide lines, corner fiducials, completion mode."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -91,9 +92,11 @@ def generate(sheets_dir: Path, only: set[str] | None = None) -> dict:
             groups[f"C{1 + i // CELLS_PER_SHEET}"] = selected[i:i + CELLS_PER_SHEET]
 
     placed = 0
+    sheets_manifest: dict[str, list[str]] = {}
     for sheet_name, cells in groups.items():
         img = _new_sheet()
         draw = ImageDraw.Draw(img)
+        sheets_manifest[sheet_name] = [c.gid for c in cells]
         for idx, cell_item in enumerate(cells):
             if only is None:
                 row, col = cell_item.row, cell_item.col
@@ -105,5 +108,6 @@ def generate(sheets_dir: Path, only: set[str] | None = None) -> dict:
                   font=_label_font(30))
         img.save(sheets_dir / f"{sheet_name}.png")
         img.save(sheets_dir / f"{sheet_name}.pdf", "PDF", resolution=300.0)
+    (sheets_dir / "manifest.json").write_text(json.dumps(sheets_manifest))
 
     return {"sheets": sorted(groups), "cells_placed": placed}
