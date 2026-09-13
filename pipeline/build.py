@@ -16,7 +16,7 @@ from .config import load as load_config
 from .mapping import CELLS, UPM, ligature_rules
 
 ASCENT, DESCENT = 1500, -500
-SPACE_ADVANCE = 160
+SPACE_ADVANCE = 500                 # ~0.24em word space (160 ran words together)
 DEFAULT_FAMILY = "TamilMaker"
 
 

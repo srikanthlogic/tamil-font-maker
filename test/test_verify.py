@@ -64,3 +64,63 @@ def test_empty_raster_fails(project):
     assert r["verdict"] == "fail"
     # restore
     Image.fromarray(_blob("round"), "L").save(project / "glyphs" / "g_u0BBE.png")
+
+
+# --- glyph_similarity gate -----------------------------------------------------
+#
+# The shipped movie fonts passed every 2026-09-13 gate while their extracted
+# "title" cells were unreadable smudges (render-vs-base IoU 0.22-0.49; clean
+# backfill scores ~0.8). These tests pin the gate that must catch that class.
+
+def test_similarity_gate_flags_garbage_glyphs(project):
+    # fixture cells are geometric blobs — nothing like the base-font letters
+    r = verify(project, base_font="test/fixtures/NotoSansTamil.ttf")
+    g = r["gates"]["glyph_similarity"]
+    assert not g["ok"]
+    assert g["below"]
+    assert r["verdict"] == "fail"
+
+
+def test_similarity_gate_passes_noto_derived_cells(tmp_path):
+    # cells filled from the fixture font itself must clear the bar
+    from pipeline.mapping import CELLS
+    from bootstrap import ref_render
+    glyphs = tmp_path / "glyphs"
+    glyphs.mkdir()
+    # component cells included so the வி ligature can actually shape
+    for gid in ["g_u0B85", "g_u0B95", "g_u0BAE", "g_u0BB5",
+                "g_u0BBE", "g_u0BBF", "g_u0BB5_u0BBF"]:
+        cell = next(c for c in CELLS if c.gid == gid)
+        ref_render("".join(chr(cp) for cp in cell.cps)).save(glyphs / f"{gid}.png")
+    from pipeline.trace import trace as _trace
+    _trace(tmp_path)
+    build(tmp_path)
+    r = verify(tmp_path, base_font="test/fixtures/NotoSansTamil.ttf")
+    g = r["gates"]["glyph_similarity"]
+    assert g["ok"], g
+    assert "glyph_similarity" not in r["failed_gates"]
+
+
+def test_similarity_gate_without_base_font_caps_verdict_at_warn(project):
+    r = verify(project)
+    g = r["gates"]["glyph_similarity"]
+    assert g.get("skipped")
+    assert "glyph_similarity" not in r["failed_gates"]
+    assert r["verdict"] == "warn"
+
+
+# --- real-word artifact for the agent read-back --------------------------------
+
+def test_words_artifact_exists_with_ink(project):
+    verify(project)
+    p = project / "qa" / "words.png"
+    assert p.exists()
+    img = np.array(Image.open(p))
+    assert (img < 100).sum() > 100
+
+
+def test_sample_words_stay_inside_cell_inventory():
+    from pipeline.mapping import CELLS, SAMPLE_WORDS
+    covered = {cp for c in CELLS for cp in c.cps} | {ord(" ")}
+    for w in SAMPLE_WORDS:
+        assert all(ord(ch) in covered for ch in w), w

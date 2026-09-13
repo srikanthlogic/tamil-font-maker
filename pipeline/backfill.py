@@ -9,12 +9,19 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .gfx import render_ref
+from .gfx import ink_extents, render_ref
 from .ingest import BASELINE_IN_RASTER, HEADLINE_IN_RASTER, WORK_H, WORK_W, _record
-from .mapping import CELLS
+from .mapping import CELLS, UPM
+from .trace import EM_ASCENT, GUIDE_PX
+
+# Em-true raster size: the trace stage maps the template's GUIDE_PX guide band
+# to EM_ASCENT em units, so one em of the base font must occupy
+# UPM * GUIDE_PX / EM_ASCENT raster pixels for backfilled glyphs to carry
+# their true relative size (300px here shrunk fonts to ~2/3 scale).
+REF_PX = round(UPM * GUIDE_PX / EM_ASCENT)
 
 
-def backfill(project: Path, font_path: str, px: int = 300,
+def backfill(project: Path, font_path: str, px: int = REF_PX,
              glyphs_dir: Path | None = None) -> dict:
     project = Path(project)
     glyphs = Path(glyphs_dir) if glyphs_dir else project / "glyphs"
@@ -42,16 +49,26 @@ def backfill(project: Path, font_path: str, px: int = 300,
                 continue
             ys, xs = np.nonzero(a)
             ink = ref.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
-            # fit into the working raster: 360x480, baseline at 400
-            max_h, max_w = int(WORK_H * 0.8), WORK_W - 8
-            if ink.height > max_h or ink.width > max_w:
-                s = min(max_h / ink.height, max_w / ink.width)
-                ink = ink.resize((max(1, int(ink.width * s)),
-                                  max(1, int(ink.height * s))), Image.LANCZOS)
-            raster = Image.new("L", (WORK_W, WORK_H), 0)
-            bottom = BASELINE_IN_RASTER if c.kind != "sign" else HEADLINE_IN_RASTER + 80
-            px_x = (WORK_W - ink.width) // 2
-            px_y = max(4, bottom - ink.height)
+            px_above, px_below = ink_extents(font_path, text, px)
+            # shrink only if the glyph cannot fit the cell height at
+            # reference scale; width may exceed the cell — the raster is
+            # just an intermediate and trace/build are raster-size agnostic,
+            # so wide syllables keep their true em width
+            scale = min(1.0, (BASELINE_IN_RASTER - 4) / max(px_above, 1.0),
+                        (WORK_H - 4.0) / max(px_above + px_below, 1.0))
+            if scale < 1.0:
+                ink = ink.resize((max(1, int(ink.width * scale)),
+                                  max(1, int(ink.height * scale))), Image.LANCZOS)
+            raster_w = max(WORK_W, ink.width + 8)
+            raster = Image.new("L", (raster_w, WORK_H), 0)
+            px_x = (raster_w - ink.width) // 2
+            if c.cps[-1] == 0x0BCD and c.gid in synthetic_dot:
+                px_y = HEADLINE_IN_RASTER + 80
+            else:
+                # seat by BASELINE: ink's yMax sits on the baseline, so
+                # descending strokes stay below it
+                px_y = BASELINE_IN_RASTER - round(px_above * scale)
+                px_y = min(max(4, px_y), WORK_H - 4 - ink.height)
             raster.paste(255, (px_x, px_y, px_x + ink.width, px_y + ink.height),
                          mask=ink)
             raster.save(out)

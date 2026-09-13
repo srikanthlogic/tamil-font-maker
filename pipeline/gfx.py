@@ -167,14 +167,61 @@ def render_ref(font_path: str, text: str, px: int = 300) -> Image.Image:
         gid = tt.getGlyphOrder().index(name)
         upm = tt["head"].unitsPerEm
         asc, desc = tt["hhea"].ascent, tt["hhea"].descent
-        canvas = (int((asc - desc) * px / upm) + 40,
-                  int((asc - desc) * px / upm) + 40)
+        # size the canvas from the glyph's OWN bbox: wide two-part signs and
+        # tall matras exceed the ascent-descent band and would clip
+        g = tt["glyf"][name]
+        top, bottom = max(asc, g.yMax), min(desc, g.yMin)
+        left = min(0, g.xMin)
+        canvas = (int((g.xMax - left) * px / upm) + 40,
+                  int((top - bottom) * px / upm) + 40)
         return rasterize_glyphs(tt, [(gid, 0, 0)], px, canvas,
-                                (20, 20 + asc * px / upm))
+                                (20 - left * px / upm, 20 + top * px / upm))
     return render_text(font_path, text, px)
 
 
 # --- binarization --------------------------------------------------------------
+
+
+def ink_extents(font_path: str, text: str, px: int) -> tuple[float, float]:
+    """(px_above_baseline, px_below_baseline) of the shaped text rendered at
+    px. Used to seat glyphs by baseline when filling template cells. A lone
+    combining mark is measured on its own cmap glyph: HarfBuzz splits lone
+    two-part signs (ொ -> ா+ெ, lower yMax), but render_ref draws the
+    composite glyph — the extents must describe what is actually drawn."""
+    tt = _open_font(font_path)[1]
+    upm = tt["head"].unitsPerEm
+    glyf = tt["glyf"]
+    cmap = tt.getBestCmap()
+    if len(text) == 1 and 0x0BBE <= ord(text) <= 0x0BCD and ord(text) in cmap:
+        names = [cmap[ord(text)]]
+    else:
+        shaped = shape_text(open(font_path, "rb").read(), text)
+        order = tt.getGlyphOrder()
+        names = [order[g] for g, _, _ in shaped]
+    if not names:
+        return 0.0, 0.0
+    y_max = max(glyf[n].yMax for n in names)
+    y_min = min(glyf[n].yMin for n in names)
+    return y_max * px / upm, -y_min * px / upm
+
+
+def norm_iou(a_img: Image.Image, b_img: Image.Image) -> float:
+    """Scale-free shape metric: IoU of ink bounding boxes, the second
+    resized to the first. Used by the verify similarity gate and B1-B3."""
+    a = np.array(a_img) > 127
+    b = np.array(b_img) > 127
+    for m in (a, b):
+        if not m.any():
+            return 0.0
+
+    def crop(m):
+        ys, xs = np.nonzero(m)
+        return m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+
+    ca, cb = crop(a), crop(b)
+    cb = np.array(Image.fromarray(cb.astype(np.uint8) * 255).resize(
+        (ca.shape[1], ca.shape[0]), Image.LANCZOS)) > 127
+    return (ca & cb).sum() / (ca | cb).sum()
 
 
 def otsu(gray: Image.Image) -> int:

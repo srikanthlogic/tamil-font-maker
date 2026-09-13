@@ -30,9 +30,13 @@ def test_b1_full_roundtrip(tmp_path):
     assert b["gsub_rules"] == 270, "all ligature rules must be emitted"
     assert b["coverage_pct"] == 100.0
 
-    v = verify_mod.verify(proj)
+    from bootstrap import FIX_FONT
+    v = verify_mod.verify(proj, base_font=FIX_FONT)
     assert v["verdict"] == "green", {"gates": v["failed_gates"],
+                                     "skipped": v["skipped_gates"],
                                      "missing": v["missing_count"]}
+    assert v["gates"]["glyph_similarity"]["ok"], \
+        v["gates"]["glyph_similarity"]["below"]
     assert v["qa_artifacts"]
 
     # per-glyph shape fidelity: rebuilt font render vs Noto source render.

@@ -32,8 +32,12 @@ def test_b2_paper_roundtrip(tmp_path):
     assert b["gsub_rules"] == 270
     assert b["coverage_pct"] == 100.0
 
-    v = verify_mod.verify(proj, glyphs_dir=paper)
-    assert v["verdict"] == "green", v["failed_gates"]
+    from bootstrap import FIX_FONT
+    v = verify_mod.verify(proj, glyphs_dir=paper, base_font=FIX_FONT)
+    assert v["verdict"] == "green", {"gates": v["failed_gates"],
+                                     "skipped": v["skipped_gates"]}
+    assert v["gates"]["glyph_similarity"]["ok"], \
+        v["gates"]["glyph_similarity"]["below"]
 
     # shape check vs reference on a sample of cells (paper noise costs some
     # fidelity; 0.6 floor catches systematic deskew failures)

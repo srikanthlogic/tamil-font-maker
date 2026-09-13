@@ -65,3 +65,39 @@ def test_despeckle():
     out = np.array(despeckle(Image.fromarray(arr), min_area=8))
     assert out[50, 50] == 255
     assert out[6, 6] == 0
+
+
+def test_ink_extents_lone_two_part_mark_uses_composite_glyph():
+    # HarfBuzz splits a lone கொ-sign (ொ) into ா+ெ (yMax ~554/1000), but the
+    # cell raster draws the composite glyph itself (yMax ~843/1000). The
+    # extents must describe the drawn glyph, or backfill clips its top.
+    # (Real Noto values: கொ-sign composite yMax 843 -> 395px at 468px.)
+    import uharfbuzz as hb  # noqa: F401 — proves nothing shaped is needed
+    from pipeline.gfx import ink_extents
+
+    FIX = "test/fixtures/NotoSansTamil.ttf"
+    above, below = ink_extents(FIX, "ொ", 468)
+    assert above > 350, above
+    shaped = __import__("pipeline.gfx", fromlist=["shape_text"]).shape_text(
+        open(FIX, "rb").read(), "ொ")
+    assert len(shaped) >= 2  # the shaper does split it — extents must not
+
+
+def test_render_ref_lone_mark_canvas_covers_wide_glyph():
+    # a wide two-part sign (ொ ≈ 1.23em in the fixture) must be drawn fully
+    # inside render_ref's canvas — ink touching/exceeding the edge silently
+    # clips the gate's comparison (2026-09-13 waterfall regression)
+    from pipeline.gfx import render_ref
+
+    ref = render_ref("test/fixtures/NotoSansTamil.ttf", "ொ", 160)
+    a = np.asarray(ref) > 127
+    ys, xs = np.nonzero(a)
+    assert xs.min() >= 1 and xs.max() <= ref.width - 2, (xs.min(), xs.max(), ref.size)
+    assert ys.min() >= 1 and ys.max() <= ref.height - 2
+    # and the full ink width survives: the composite's own bbox at 160px
+    from fontTools.ttLib import TTFont
+
+    tt = TTFont("test/fixtures/NotoSansTamil.ttf")
+    g = tt["glyf"][tt.getBestCmap()[0x0BCA]]
+    expected = round((g.xMax - g.xMin) * 160 / tt["head"].unitsPerEm)
+    assert (xs.max() - xs.min() + 1) == pytest.approx(expected, rel=0.05)

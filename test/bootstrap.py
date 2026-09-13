@@ -4,7 +4,7 @@ photos, and the normalized-IoU shape metric."""
 import numpy as np
 from PIL import Image, ImageDraw
 
-from pipeline.gfx import rasterize_glyphs, render_ref, render_text
+from pipeline.gfx import ink_extents, rasterize_glyphs, render_ref, render_text
 from pipeline.mapping import CELLS
 from pipeline.template import BASELINE_Y, HEADLINE_Y, cell_box
 
@@ -24,58 +24,48 @@ def ref_render(text: str, px: int = 300) -> Image.Image:
 
 
 def fill_all_cells(sheets_dir, work):
-    """Rasterize each cell's text from the fixture font into its template cell."""
+    """Rasterize each cell's text from the fixture font into its template cell,
+    at the guide-calibrated reference scale, seated by baseline."""
+    from pipeline.backfill import REF_PX
+
     for c in CELLS:
         text = "".join(chr(cp) for cp in c.cps)
-        ref = ref_render(text)
+        ref = ref_render(text, REF_PX)
         a = np.array(ref) > 127
         if not a.any():
             raise RuntimeError(f"fixture render empty for {c.gid}")
         ys, xs = np.nonzero(a)
         ref = ref.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+        above, below = ink_extents(FIX_FONT, text, REF_PX)
         sheet_img = work.setdefault(
             c.sheet, Image.open(sheets_dir / f"{c.sheet}.png").convert("L"))
         x0, y0, x1, y1 = cell_box(c.row, c.col)
-        # seat ink bottom on the baseline (signs float around the headline)
-        max_h = BASELINE_Y - HEADLINE_Y + 60
-        max_w = x1 - x0 - 24
-        if ref.height > max_h or ref.width > max_w:
-            # re-render at fitted size instead of shrinking binary art —
-            # preserves stroke weight for wide split-matra combos
-            fit = min(max_h / ref.height, max_w / ref.width)
-            bigger = ref_render(text, max(48, int(300 * fit)))
-            ba = np.array(bigger) > 127
-            if ba.any():
-                bys, bxs = np.nonzero(ba)
-                ref = bigger.crop((bxs.min(), bys.min(),
-                                   bxs.max() + 1, bys.max() + 1))
-        bottom = BASELINE_Y if c.kind != "sign" else HEADLINE_Y + 80
-        px = x0 + ((x1 - x0) - ref.width) // 2
-        py = max(y0 + 40, y0 + bottom - ref.height)  # keep tall matras inside
+        band = BASELINE_Y - HEADLINE_Y          # guide-to-guide px
+        room_below = y1 - y0 - BASELINE_Y - 40  # cell room under the baseline
+        max_w = x1 - x0 - 24                    # sheet cells are shared: ink
+        scale = min(1.0, (band + 60) / max(above + below, 1.0),  # must stay
+                    room_below / max(below, 1.0), max_w / max(ref.width, 1.0))
+        if scale < 1.0:
+            ink = ref.resize((max(1, int(ref.width * scale)),
+                              max(1, int(ref.height * scale))), Image.LANCZOS)
+            above *= scale
+        else:
+            ink = ref
+        px = x0 + ((x1 - x0) - ink.width) // 2
+        py = y0 + BASELINE_Y - round(above)     # baseline-seat the glyph
         ink = Image.fromarray(
-            np.where(np.array(ref) > 127, 255, 0).astype(np.uint8))
-        sheet_img.paste(0, (px, py, px + ref.width, py + ref.height), mask=ink)
+            np.where(np.array(ink) > 127, 255, 0).astype(np.uint8))
+        sheet_img.paste(0, (px, py, px + ink.width, py + ink.height), mask=ink)
     for name, img in work.items():
         img.save(sheets_dir / f"{name}.png")
 
 
 def norm_iou(a_img, b_img) -> float:
-    """Scale-free shape metric: IoU of ink bounding boxes, the second
-    resized to the first."""
-    a = np.array(a_img) > 127
-    b = np.array(b_img) > 127
-    for m in (a, b):
-        if not m.any():
-            return 0.0
-
-    def crop(m):
-        ys, xs = np.nonzero(m)
-        return m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-
-    ca, cb = crop(a), crop(b)
-    cb = np.array(Image.fromarray(cb.astype(np.uint8) * 255).resize(
-        (ca.shape[1], ca.shape[0]), Image.LANCZOS)) > 127
-    return (ca & cb).sum() / (ca | cb).sum()
+    """Scale-free shape metric — canonical implementation lives in the
+    pipeline (the verify similarity gate shares it); re-exported here for
+    the B1-B3 roundtrips."""
+    from pipeline.gfx import norm_iou as _n
+    return _n(a_img, b_img)
 
 
 def direct_render(font_path: str, cp: int, px: int = 150):

@@ -7,7 +7,12 @@
 <style>
   :root { --bg:#0f1115; --panel:#171a21; --ink:#e8e6e1; --gold:#d4a94e; --dim:#9a9691; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--ink); font:16px/1.65 system-ui, sans-serif; }
+  @font-face { font-family:'Noto Tamil FB';
+    src:url('fonts/NotoTamil-fallback.woff2') format('woff2');
+    font-display:swap;
+    unicode-range:U+0B80-0BFF, U+2013-2014, U+2018-201D, U+2026; }
+  body { background:var(--bg); color:var(--ink);
+         font:16px/1.65 system-ui, 'Noto Tamil FB', sans-serif; }
   .wrap { max-width:1040px; margin:0 auto; padding:0 24px; }
   header { padding:64px 0 40px; border-bottom:1px solid #23262e; }
   h1 { font-size:2.4rem; line-height:1.2; }
@@ -29,16 +34,16 @@
   pre { background:#0b0d11; border:1px solid #23262e; border-radius:10px; padding:16px;
         overflow-x:auto; color:#c8d3b8; margin-top:14px; }
   .typedemo { background:var(--panel); border:1px solid #2a2e38; border-radius:12px; padding:20px; }
-  .typedemo input { width:100%; font-size:1.6rem; padding:12px; border-radius:8px;
+  .typedemo input { width:100%; font-size:1.6rem; font-family:inherit; padding:12px; border-radius:8px;
         border:1px solid #2a2e38; background:#0b0d11; color:var(--ink); }
   @font-face { font-family:'VikramTitle'; src:url('fonts/VikramTitle.woff2') format('woff2'); }
   @font-face { font-family:'PonniyinSelvanTitle'; src:url('fonts/PonniyinSelvanTitle.woff2') format('woff2'); }
   .out { font-size:2rem; margin-top:14px; min-height:3.2rem; word-break:break-word; }
-  .out.vikram { font-family:'VikramTitle'; }
-  .out.ps1 { font-family:'PonniyinSelvanTitle'; }
+  .out.vikram { font-family:'VikramTitle','Noto Tamil FB',sans-serif; }
+  .out.ps1 { font-family:'PonniyinSelvanTitle','Noto Tamil FB',sans-serif; }
   .wf { line-height:1.5; background:#0b0d11; border-radius:8px; padding:10px 14px; overflow:hidden; }
-  .wf.vikram { font-family:'VikramTitle'; }
-  .wf.ps1 { font-family:'PonniyinSelvanTitle'; }
+  .wf.vikram { font-family:'VikramTitle','Noto Tamil FB',sans-serif; }
+  .wf.ps1 { font-family:'PonniyinSelvanTitle','Noto Tamil FB',sans-serif; }
   .notice { background:#241d12; border:1px solid #59431f; border-radius:10px;
             padding:14px 18px; font-size:.9rem; color:#d8c9a3; margin-top:18px; }
   footer { padding:28px 0 60px; color:var(--dim); font-size:.9rem; }
@@ -58,22 +63,26 @@
 </header>
 
 <section class="wrap">
-  <h2>Two fonts from popular movies — built by this pipeline</h2>
-  <p style="color:var(--dim);margin-bottom:20px">Real cinema posters → agent vision crops & classifies the title
-  lettering → extract pipeline traces it → missing body cells are backfilled from Noto Sans Tamil.
-  The title types in the movie's own lettering; everything else stays fully usable.</p>
+  <h2>Two complete Tamil fonts from the poster runs</h2>
+  <p style="color:var(--dim);margin-bottom:20px">Real cinema posters → the agent crops &amp; classifies the title
+  lettering → the extract pipeline traces it → missing body cells are backfilled from Noto Sans Tamil.
+  In these two runs the poster titles failed the legibility gate — the lettering is fused with artwork,
+  and every extracted crop scored far below the bar — so both fonts ship <b>fully backfilled: 296/296 cells,
+  every glyph shape-gated against the base font</b>. What you type below renders entirely in font glyphs.</p>
   <div class="cards">
     <div class="card">
-      <h3>Vikram Title (விக்ரம்)</h3>
-      <p>Vikram (2022) — 4 title glyphs extracted from the theatrical poster, 292 backfilled.</p>
-      <img src="assets/vikram-title-specimen.png" alt="Vikram Title specimen">
+      <h3>Vikram (விக்ரம்)</h3>
+      <p>Vikram (2022) poster run — 296/296 cells, all Noto-derived and
+      shape-gated (title extraction rejected by the legibility gate).</p>
+      <img src="assets/vikram-title-specimen.png" alt="Vikram run specimen">
       <a class="dl" href="fonts/VikramTitle.ttf" download>⬇ TTF</a>
       <a class="dl ghost" href="fonts/VikramTitle.woff2" download>⬇ WOFF2</a>
     </div>
     <div class="card">
-      <h3>Ponniyin Selvan Title (பொன்னியின் செல்வன்)</h3>
-      <p>Ponniyin Selvan: Part I (2022) — 8 title glyphs across two title lines, 288 backfilled.</p>
-      <img src="assets/ponniyin-selvan-title-specimen.png" alt="Ponniyin Selvan Title specimen">
+      <h3>Ponniyin Selvan (பொன்னியின் செல்வன்)</h3>
+      <p>Ponniyin Selvan: Part I (2022) poster run — 296/296 cells, all
+      Noto-derived and shape-gated (title extraction rejected).</p>
+      <img src="assets/ponniyin-selvan-title-specimen.png" alt="Ponniyin Selvan run specimen">
       <a class="dl" href="fonts/PonniyinSelvanTitle.ttf" download>⬇ TTF</a>
       <a class="dl ghost" href="fonts/PonniyinSelvanTitle.woff2" download>⬇ WOFF2</a>
     </div>
@@ -94,30 +103,32 @@
     <div class="out vikram" id="outV" style="margin-top:12px"></div>
     <div class="out ps1" id="outP" style="display:none"></div>
     <p style="color:var(--dim);font-size:.85rem;margin:10px 0 0">
-      Poster-art glyphs: வ ி க ் ர ம் (Vikram) · ப ொ ன னி யி செ ல் வ (PS-1).
-      Everything else is Noto Sans Tamil body. Mixed text shows both.</p>
+      Every glyph above is a font glyph — 296/296 cells, no per-character
+      fallback needed for Tamil.</p>
     <div style="margin-top:18px">
       <h3 style="font-size:.95rem;margin-bottom:8px">Waterfall</h3>
       <div class="wf vikram">
-        <div style="font-size:14px">விக்ரம் எழுத்துரு 14px — தமிழ் 123</div>
-        <div style="font-size:20px">விக்ரம் எழுத்துரு 20px — தமிழ் 123</div>
-        <div style="font-size:28px">விக்ரம் எழுத்துரு 28px — தமிழ் 123</div>
-        <div style="font-size:40px">விக்ரம் 40px</div>
-        <div style="font-size:56px">விக்ரம் 56px</div>
+        <div style="font-size:14px">விக்ரம் எழுத்துரு 14 - தமிழ் 123</div>
+        <div style="font-size:20px">விக்ரம் எழுத்துரு 20 - தமிழ் 123</div>
+        <div style="font-size:28px">விக்ரம் எழுத்துரு 28 - தமிழ் 123</div>
+        <div style="font-size:40px">விக்ரம் 40</div>
+        <div style="font-size:56px">விக்ரம் 56</div>
       </div>
       <div class="wf ps1" style="margin-top:14px">
-        <div style="font-size:14px">பொன்னியின் செல்வன் 14px — தமிழ் 123</div>
-        <div style="font-size:20px">பொன்னியின் செல்வன் 20px — தமிழ் 123</div>
-        <div style="font-size:28px">பொன்னியின் செல்வன் 28px — தமிழ் 123</div>
-        <div style="font-size:40px">பொன்னியின் 40px</div>
-        <div style="font-size:56px">பொன்னியின் 56px</div>
+        <div style="font-size:14px">பொன்னியின் செல்வன் 14 - தமிழ் 123</div>
+        <div style="font-size:20px">பொன்னியின் செல்வன் 20 - தமிழ் 123</div>
+        <div style="font-size:28px">பொன்னியின் செல்வன் 28 - தமிழ் 123</div>
+        <div style="font-size:40px">பொன்னியின் 40</div>
+        <div style="font-size:56px">பொன்னியின் 56</div>
       </div>
     </div>
   </div>
-  <div class="notice"><b>Rights notice.</b> The extracted title letterings belong to their respective
-  film producers and typographers (Raaj Kamal Films International; Madras Talkies / Lyca Productions).
-  These fonts are experimental demos of the pipeline, for personal and educational use only —
-  do not redistribute or use commercially. Issues will be honored with immediate takedown.</div>
+  <div class="notice"><b>Font notice.</b> Both fonts are fully derived from
+  Noto Sans Tamil (SIL Open Font License 1.1). The poster title lettering was
+  extracted experimentally and then rejected by the legibility gate, so no
+  film typography remains in the shipped files; the font names describe the
+  poster runs that produced them, and film titles belong to their producers
+  (Raaj Kamal Films International; Madras Talkies / Lyca Productions).</div>
 </section>
 
 <section class="wrap">
@@ -134,9 +145,10 @@
       matra reordering entirely. Lookups registered under ccmp + liga (HarfBuzz's Tamil shaper
       ignores plain liga — found empirically).</p></div>
     <div class="card"><h3>4 · verify (agent QA)</h3><p>Programmatic gates: non-empty rasters, em-bounds,
-      shaping identities (கி → one glyph; composed == decomposed கௌ), notdefs vs coverage. Visual gates:
-      HarfBuzz-rendered charts and per-glyph comparisons the agent inspects by eye, then iterates
-      per-cell parameters or flags redraws.</p></div>
+      shaping identities (கி → one glyph; composed == decomposed கௌ), notdefs vs coverage, and
+      per-glyph shape similarity against the base font (min IoU 0.5 — a green verdict is unreachable
+      without it). Visual gates: HarfBuzz-rendered charts, and a real-word chart the agent must
+      transcribe by eye before anything ships.</p></div>
   </div>
 </section>
 
@@ -146,7 +158,7 @@
   pipeline's own formats and gates the full roundtrip: <b>B1</b> digital sheets (296/296 traced,
   270/270 rules, per-glyph IoU), <b>B2</b> synthesized phone photos (perspective ≤ 70 px jitter, noise,
   uneven light → fiducial deskew), <b>B3</b> poster-like extraction with occlusion flagging and
-  partial-font degradation. 40/40 tests green.</p>
+  partial-font degradation. 56 tests green.</p>
 </section>
 
 <section class="wrap">
@@ -157,18 +169,19 @@ $ pip3 --python .venv/bin/python install fonttools uharfbuzz potracer cu2qu Pill
 $ .venv/bin/python -m pipeline.cli init projects/myfont --family "My Font"
 $ .venv/bin/python -m pipeline.cli template projects/myfont   # draw the sheets, or drop images in samples/
 $ .venv/bin/python -m pipeline.cli ingest-digital projects/myfont sheets/S1.png
-$ .venv/bin/python -m pipeline.cli ingest-extract projects/myfont g_u0BB5=crops/ka.png --preset faithful
+$ .venv/bin/python -m pipeline.cli ingest-extract projects/myfont g_u0B95=crops/ka.png --preset faithful
 $ .venv/bin/python -m pipeline.cli trace projects/myfont && \
   .venv/bin/python -m pipeline.cli build projects/myfont && \
   .venv/bin/python -m pipeline.cli verify projects/myfont</pre>
   <p style="margin-top:14px;color:var(--dim)">The full agent protocol lives in
   <code>skills/tamil-font-maker/SKILL.md</code>. Partial fonts degrade legibly (spacing matras),
   and <code>template --only …</code> emits completion sheets for exactly the missing cells —
-  or <code>backfill</code> completes them from any base font, as these two movie fonts did.</p>
+  or <code>backfill</code> completes them from any base font, as these two poster runs ended up doing
+  after their extracted titles were rejected by the legibility gate.</p>
 </section>
 
 <footer class="wrap">
-  Code: MIT. Extracted lettering: see the rights notice above.
+  Code: MIT. Fonts: Noto Sans Tamil derived (OFL) — see the font notice above.
   Built with ZCode · HarfBuzz · fonttools · potrace · Noto Sans Tamil (OFL).
 </footer>
 

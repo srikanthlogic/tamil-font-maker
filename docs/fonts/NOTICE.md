@@ -1,18 +1,19 @@
-# Font extraction notice
+# Font notice
 
-The two movie fonts in `docs/fonts/` are experimental outputs of this
-pipeline, provided to demonstrate it:
+The two fonts in `docs/fonts/` are outputs of this pipeline's poster runs,
+named for the movies whose posters seeded them:
 
-- `VikramTitle.*` — title lettering extracted from the theatrical poster of
-  *Vikram* (2022), Raaj Kamal Films International.
-- `PonniyinSelvanTitle.*` — title lettering extracted from the theatrical
-  poster of *Ponniyin Selvan: Part I* (2022), Madras Talkies / Lyca Productions.
+- `VikramTitle.*` — from the *Vikram* (2022) poster run, Raaj Kamal Films
+  International.
+- `PonniyinSelvanTitle.*` — from the *Ponniyin Selvan: Part I* (2022) poster
+  run, Madras Talkies / Lyca Productions.
 
-The title lettering artwork remains the property of the respective producers
-and typographers. These fonts are for **personal and educational use only**;
-they must not be redistributed commercially or used in commercial work.
-Rights holders may request immediate takedown.
+**All 296 glyphs in both fonts are derived from Noto Sans Tamil** (SIL Open
+Font License 1.1, see `test/fixtures/OFL.txt`); OFL terms apply. The poster
+title lettering was extracted experimentally but rejected by the pipeline's
+legibility gate (the lettering is fused with poster artwork), so no film
+typography remains in these files. The film names are used only to describe
+the pipeline runs, not as branding of the fonts.
 
-The non-title glyphs in these fonts are derived from Noto Sans Tamil
-(SIL Open Font License 1.1, see `test/fixtures/OFL.txt`); OFL terms apply to
-those glyphs.
+`NotoTamil-fallback.woff2` is a subset of the same Noto Sans Tamil, served so
+the page itself renders Tamil on systems without a Tamil font installed.

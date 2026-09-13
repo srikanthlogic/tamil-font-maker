@@ -138,3 +138,12 @@ SAMPLE_TEXTS = (
     "ஆண்டு 2026 ஆகும்.",
     "ஃஜஷஸஹ (க-ன்) ௦௧௨௩",
 )
+
+# Real words for the verify read-back artifact (qa/words.png): an agent must
+# transcribe these from the rendered chart before a green verdict. Kept inside
+# the 296-cell inventory; test_sample_words_stay_inside_cell_inventory enforces it.
+SAMPLE_WORDS = (
+    "தமிழ்", "விக்ரம்", "பொன்னியின் செல்வன்", "கல்வி", "மரம்",
+    "தண்ணீர்", "எழுத்து", "வானம்", "சென்னை", "கணினி",
+    "புத்தகம்", "நண்பா", "காக்கா", "லட்டு",
+)

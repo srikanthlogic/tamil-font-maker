@@ -80,7 +80,7 @@ def cmd_build(args) -> dict:
 
 
 def cmd_verify(args) -> dict:
-    report = verify.verify(Path(args.project))
+    report = verify.verify(Path(args.project), base_font=args.base_font)
     return report
 
 
@@ -136,6 +136,10 @@ def main(argv=None):
 
     s = sub.add_parser("verify")
     s.add_argument("project")
+    s.add_argument("--base-font",
+                   help="reference font for the glyph-similarity gate "
+                        "(e.g. the backfill source); without it the gate is "
+                        "skipped and the verdict caps at warn")
     s.set_defaults(fn=cmd_verify)
 
     args = ap.parse_args(argv)

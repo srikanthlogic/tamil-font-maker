@@ -9,11 +9,15 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from .gfx import render_text
-from .mapping import CELLS, SAMPLE_TEXTS, ligature_rules
+from .gfx import norm_iou, render_ref, render_text
+from .mapping import CELLS, SAMPLE_TEXTS, SAMPLE_WORDS, ligature_rules
 
-EM_MIN, EM_MAX = -600, 2600     # generous em-box bounds (guides: 0..1400)
+# generous em-box bounds (guides: 0..1400). Guide-calibrated backfill puts
+# tall matras near 1.0em, deep descenders near -0.55em, and the widest shaped
+# runs (ணௌ = consonant + two-part sign) near 3.6em — the band must cover them
+EM_MIN, EM_MAX = -1500, 8000
 CHART_PX = 96
+SIMILARITY_MIN = 0.5            # min shape-normalized IoU vs base font per cell
 
 
 def _font_path(project: Path) -> Path:
@@ -84,6 +88,38 @@ def _programmatic_gates(font_path: Path, project: Path, glyphs_dir: Path,
     return gates
 
 
+def _gate_glyph_similarity(font_path: Path, base_font: str,
+                           filled: set[str]) -> dict:
+    """Every filled cell's render must resemble the base-font reference.
+    Catches exactly what shipped in the movie fonts: garbage extracted cells
+    that passed every other gate because garbage is non-empty, in-bounds,
+    and shapes to its own glyph name."""
+    text_of = {c.gid: "".join(chr(cp) for cp in c.cps) for c in CELLS}
+    scores, skipped = {}, []
+    for gid in sorted(filled):
+        text = text_of[gid]
+        try:
+            # 160px: thin-stroke signs lose too much to antialiasing at 80px,
+            # collapsing clean cells into the garbage band. Lone combining
+            # marks render outline-direct on BOTH sides: shaping a lone
+            # two-part sign splits it (ொ -> ா+ெ overlapping), which no real
+            # text path exercises — real words use the precomposed ligatures.
+            lone_mark = len(text) == 1 and 0x0BBE <= ord(text) <= 0x0BCD
+            built = (render_ref if lone_mark else render_text)(str(font_path), text, 160)
+            ref = render_ref(base_font, text, 160)
+        except Exception as exc:  # noqa: BLE001 — report, don't die mid-gate
+            scores[gid] = 0.0
+            continue
+        if not (np.asarray(ref) > 127).any():
+            skipped.append(gid)  # e.g. standalone pulli: synthetic dot by design
+            continue
+        scores[gid] = norm_iou(built, ref)
+    below = {g: round(s, 3) for g, s in scores.items() if s < SIMILARITY_MIN}
+    return {"ran": True, "ok": not below, "min": SIMILARITY_MIN,
+            "below": dict(sorted(below.items(), key=lambda kv: kv[1])[:10]),
+            "skipped": skipped, "n": len(scores)}
+
+
 def _visual_artifacts(font_path: Path, project: Path, glyphs_dir: Path) -> list[str]:
     qa = project / "qa"
     qa.mkdir(exist_ok=True)
@@ -139,6 +175,26 @@ def _visual_artifacts(font_path: Path, project: Path, glyphs_dir: Path) -> list[
         img.save(qa / "samples.png")
         made.append("qa/samples.png")
 
+    # real words at two sizes — the agent read-back chart: transcribe these
+    # before accepting a green verdict; a mangled glyph shows up instantly
+    word_imgs = []
+    for px in (32, 64):
+        for text in SAMPLE_WORDS:
+            try:
+                word_imgs.append((px, render_text(str(font_path), text, px)))
+            except Exception:  # noqa: BLE001 — one bad word must not kill the sheet
+                pass
+    if word_imgs:
+        w = max(i.width for _, i in word_imgs) + 20
+        h = sum(i.height + 8 for _, i in word_imgs) + 8
+        img = Image.new("L", (w, h), 255)
+        y = 8
+        for _, wi in word_imgs:
+            img.paste(wi, (10, y))
+            y += wi.height + 8
+        img.save(qa / "words.png")
+        made.append("qa/words.png")
+
     # side-by-side: source raster vs font render, per covered cell (first sheet)
     cmp_cells = covered[:25]
     if cmp_cells:
@@ -163,7 +219,8 @@ def _visual_artifacts(font_path: Path, project: Path, glyphs_dir: Path) -> list[
     return made
 
 
-def verify(project: Path, glyphs_dir: Path | None = None) -> dict:
+def verify(project: Path, glyphs_dir: Path | None = None,
+           base_font: str | None = None) -> dict:
     project = Path(project)
     glyphs_dir = Path(glyphs_dir) if glyphs_dir else project / "glyphs"
     font_path = _font_path(project)
@@ -172,10 +229,21 @@ def verify(project: Path, glyphs_dir: Path | None = None) -> dict:
     missing = [c.gid for c in CELLS if c.gid not in filled]
 
     gates = _programmatic_gates(font_path, project, glyphs_dir, filled)
+    if base_font:
+        gates["glyph_similarity"] = _gate_glyph_similarity(
+            font_path, base_font, filled)
+    else:
+        gates["glyph_similarity"] = {
+            "ran": False, "ok": True, "min": SIMILARITY_MIN, "below": {},
+            "n": 0, "skipped": "no base font — pass --base-font to enable; "
+                               "green requires it",
+        }
     artifacts = _visual_artifacts(font_path, project, glyphs_dir)
 
     failed_gates = [k for k, v in gates.items() if not v["ok"]]
-    verdict = "fail" if failed_gates else ("warn" if missing else "green")
+    skipped_gates = [k for k, v in gates.items() if not v.get("ran", True)]
+    verdict = "fail" if failed_gates else \
+        ("warn" if missing or skipped_gates else "green")
 
     report = {
         "verdict": verdict,
@@ -185,6 +253,7 @@ def verify(project: Path, glyphs_dir: Path | None = None) -> dict:
         "missing_sample": missing[:20],
         "gates": gates,
         "failed_gates": failed_gates,
+        "skipped_gates": skipped_gates,
         "qa_artifacts": artifacts,
         "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }

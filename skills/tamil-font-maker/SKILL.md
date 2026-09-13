@@ -63,14 +63,27 @@ For arbitrary images with Tamil lettering:
 ## The QA loop (your main job)
 
 `verify` emits `reports/verify.json` plus PNG artifacts in `projects/<name>/qa/`
-(combo chart, sample sentences, per-glyph source-vs-output comparisons).
+(combo chart, sample sentences, real-word chart, per-glyph source-vs-output
+comparisons).
 
 - **Read the JSON.** Programmatic gates (`failed_gates`) are mandatory:
   non-empty rasters, em-bounds, shaping identities (கி → one precomposed
   glyph; க் → pulli form; composed == decomposed கௌ), notdefs matching
   coverage. A `fail` verdict means fix, not ship.
-- **Read the QA images.** You are the visual judge: look for clipped glyphs,
-  baseline drift, matra collisions, mistraces, ink blobs.
+- **Run the similarity gate.** Whenever the font was backfilled or a base
+  reference font exists, run
+  `verify projects/<name> --base-font <that font>`: every filled cell is
+  shape-compared against the base (min IoU 0.5). **A green verdict is
+  unreachable without it** — without `--base-font` the gate is skipped and
+  the verdict caps at `warn`. Do not ship a `warn`.
+- **Read the QA images, then transcribe.** You are the visual judge: look
+  for clipped glyphs, baseline drift, matra collisions, mistraces, ink
+  blobs. Then Read `qa/words.png` and **type out each word you see**.
+  Any word you cannot read cleanly = the font ships garbage — flag the cell,
+  delete its glyph PNG + outline + manifest entry, re-ingest or backfill
+  that cell, and re-run trace/build/verify. (This exact step is what let
+  mangled poster-extracted title glyphs ship as "green" on 2026-09-13: the
+  gates were blind to glyph quality and nobody transcribed the chart.)
 - **Iterate per cell.** Put per-cell overrides in `projects/<name>/config.toml`
   (`[cells.g_u0BBF]`): `threshold` (int — fixed binarization cutoff at
   ingest, replacing the mode default: digital 190 / paper otsu-clamped /
@@ -94,7 +107,8 @@ template <project> [--only GID...]      # full or completion sheets
 ingest-digital <project> <sheet.png>
 ingest-paper <project> <photo> --sheet S1
 ingest-extract <project> gid=crop.png... [--preset faithful|clean]
-trace <project> / build <project> / verify <project>
+trace <project> / build <project>
+verify <project> [--base-font FONT]      # gate needs the base font to run
 ```
 
 Exit codes: stage commands 0 on success; `verify` returns 2 on `fail` verdict.

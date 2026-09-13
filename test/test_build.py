@@ -80,3 +80,13 @@ def test_shaping_ligatures(font_path):
 
 def test_woff2_alongside(font_path):
     assert font_path.with_suffix(".woff2").exists()
+
+
+def test_space_advance_is_word_proportionate(font_path):
+    # 160 units (~0.08em) made words run together in running text; a word
+    # space should sit near a quarter em like reference fonts
+    from fontTools.ttLib import TTFont
+
+    tt = TTFont(str(font_path))
+    advance = tt["hmtx"]["g_u0020"][0]
+    assert 0.20 * tt["head"].unitsPerEm <= advance <= 0.30 * tt["head"].unitsPerEm
