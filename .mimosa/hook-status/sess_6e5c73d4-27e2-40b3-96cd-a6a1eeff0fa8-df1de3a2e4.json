@@ -1,10 +1,10 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-09-13T01:57:14.055Z",
+  "recordedAt": "2026-09-13T02:03:05.711Z",
   "sessionId": "sess_6e5c73d4-27e2-40b3-96cd-a6a1eeff0fa8",
   "event": "PostToolUse",
   "toolName": "Edit",
-  "file": "/media/data/AgenticCode/ZCode/.zcode/workspace/default/tamil-font-maker/pipeline/trace.py",
+  "file": "/media/data/AgenticCode/ZCode/.zcode/workspace/default/tamil-font-maker/test/test_build.py",
   "outcome": "inconclusive",
   "coverage": "partial",
   "findingCount": 0,
