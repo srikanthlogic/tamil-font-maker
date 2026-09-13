@@ -29,7 +29,7 @@ Business framing: **any image → TTF**. Cinema posters, signboards, book pages,
 
 Every cell: glyph id, codepoint sequence, category, sheet placement, GSUB rule (if any). All later stages derive from this table; nothing else hardcodes Tamil.
 
-### Core (278 cells)
+### Core (260 cells)
 
 | Category | Count | Codepoints | Mapped by |
 |---|---|---|---|
@@ -38,7 +38,7 @@ Every cell: glyph id, codepoint sequence, category, sheet placement, GSUB rule (
 | Consonants (bare) | 18 | க ங ச ஞ ட ண த ந ப ம ய ர ல வ ழ ள ற ன (U+0B95…) | direct cmap |
 | Signs (matras + pulli) | 13 | ா ி ீ ு ூ ெ ே ை ொ ோ ௌ ௗ (12) + pulli ் (U+0BCD) | direct cmap |
 | Pulli forms | 18 | க் ங் ச் … (consonant + ் drawn precomposed) | GSUB: (C, ்) → glyph |
-| Uyirmei | 216 | all consonant × 12-vowel combinations, drawn precomposed | GSUB ligatures (§9) |
+| Uyirmei | 198 | consonant × 11 vowel-sign combinations (ஆ–ஔ), drawn precomposed; the அ column is the bare consonant itself, not a separate glyph | GSUB ligatures (§9) |
 
 ### Extras (36 cells)
 
@@ -51,7 +51,7 @@ Every cell: glyph id, codepoint sequence, category, sheet placement, GSUB rule (
 
 Non-drawn: space (U+0020, advance-only), `.notdef`.
 
-**Total: 314 drawn cells.** (The folk number "247" counts characters, not cells; proper decomposition adds bare consonants and pulli forms.)
+**Total: 296 drawn cells.** (The folk number "247" counts characters, not cells; proper decomposition adds bare consonants and pulli forms, while the inherent-அ column collapses into the consonants.)
 
 ## 5. Template specification
 
@@ -63,7 +63,7 @@ Generated at 300 dpi as PNG (digital mode) and print-ready PDF (paper mode), A4 
 | S2 | consonants (18) | 5×4 |
 | S3 | signs (13) | loose grid |
 | S4 | pulli forms (18) | 5×4 |
-| S5–S10 | uyirmei, 36 cells each | 6 cols (consonants) × 6 rows (matras) |
+| S5–S10 | uyirmei, 198 cells (3 consonant-groups × 2 vowel-groups: three 6×6 + three 6×5) | 6 cols × 6 or 5 rows |
 | S11 | Tamil numerals + grantha (14) | loose grid |
 | S12 | digits + punctuation (22) | 5×5 |
 
@@ -130,7 +130,7 @@ Programmatic gates:
 - every test string renders with zero `.notdef` references for covered text.
 
 Visual gates (rendered via uharfbuzz + Pillow at multiple sizes):
-- full uyirmei chart (216 cells),
+- full uyirmei chart (198 cells),
 - pulli-form chart, numerals/digits/punctuation line,
 - sample Tamil sentences (real prose),
 - **side-by-side contact sheets**: rendered output vs source glyph crops, per glyph — the core comparison artifact the agent inspects.
@@ -174,7 +174,7 @@ All three green = the pipeline is proven fully agentically; real user art then r
 - System Python 3.14; project venv. Already installed: fonttools 4.61.1, Pillow 12, numpy 2.3.
 - pip: `uharfbuzz` (abi3 wheels), `potracer` (pure Python), `brotli` (optional).
 - **No opencv** — deliberate: fiducial detection + perspective warp are ~100 lines of numpy, fully unit-tested, and sidestep cp314 wheel risk.
-- Risks: cp314 wheels for uharfbuzz/brotli (both ship abi3; if uharfbuzz fails, shaping gates fall back to a system `hb-shape` CLI, else the gate is marked blocked rather than silently skipped). potracer speed on ~314 small rasters is negligible.
+- Risks: cp314 wheels for uharfbuzz/brotli (both ship abi3; if uharfbuzz fails, shaping gates fall back to a system `hb-shape` CLI, else the gate is marked blocked rather than silently skipped). potracer speed on ~296 small rasters is negligible.
 
 ## 12. Testing strategy
 

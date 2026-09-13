@@ -4,7 +4,7 @@
 
 **Goal:** Build the `tamil-font-maker` ZCode plugin + Python pipeline that turns reference imagery (template sheets or arbitrary images) into a valid Tamil TTF, verified by the B1–B3 bootstrap suite with zero human-drawn art.
 
-**Architecture:** Deterministic stage pipeline (template → ingest → trace → build → verify) behind one CLI (`python -m pipeline <stage>`), all state per-project; `mapping.py` is the single source of truth for the 314-cell glyph set and 306 GSUB rules. A shared rasterizer (uharfbuzz shaping + fontTools outline → XOR-filled polygons) powers fixtures, verify renders, and pixel-diff gates. The plugin skill makes the agent the orchestrator/QA driver.
+**Architecture:** Deterministic stage pipeline (template → ingest → trace → build → verify) behind one CLI (`python -m pipeline <stage>`), all state per-project; `mapping.py` is the single source of truth for the 296-cell glyph set and 306 GSUB rules. A shared rasterizer (uharfbuzz shaping + fontTools outline → XOR-filled polygons) powers fixtures, verify renders, and pixel-diff gates. The plugin skill makes the agent the orchestrator/QA driver.
 
 **Tech Stack:** Python 3.14 (venv), fonttools 4.61 (+ feaLib, otlLib, cu2qu), Pillow, numpy, potracer, uharfbuzz, brotli (optional). No opencv — fiducials + homography in numpy.
 
@@ -46,14 +46,14 @@ class Cell:
     kind: str           # uyir|ayutham|consonant|sign|pulli_form|uyirmei|numeral|grantha|digit|punct
     sheet: str; row: int; col: int
     cmap_cp: int | None # direct cmap mapping (None for pulli_form/uyirmei)
-CELLS: tuple[Cell, ...]            # exactly 314
+CELLS: tuple[Cell, ...]            # exactly 296
 def cell(gid) -> Cell
 def ligature_rules() -> list[tuple[tuple[int,...], str]]  # 306 (seq -> gid), sorted longest-first
 SAMPLE_TEXTS: list[str]            # test sentences for verify
 ```
-Data: UYIR 12 (அ0B85 ஆ0B86 இ0B87 ஈ0B88 உ0B89 ஊ0B8A எ0B8E ஏ0B8F ஐ0B90 ஒ0B92 ஓ0B93 ஔ0B94); CONSONANTS 18 (க0B95 ங0B99 ச0B9A ஞ0B9E ட0B9F ண0BA3 த0BA4 ந0BA8 ப0BAA ம0BAE ய0BAF ர0BB0 ல0BB2 வ0BB5 ழ0BB4 ள0BB3 ற0BB1 ன0BA9); SIGNS: ா0BBE ி0BBF ீ0BC0 ு0BC1 ூ0BC2 ெ0BC6 ே0BC7 ை0BC8 ொ0BCA ோ0BCB ௌ0BCC ௗ0BD7 + pulli ்0BCD; VOWEL→SIGN map: ஆ→[ா] இ→[ி] ஈ→[ீ] உ→[ு] ஊ→[ூ] எ→[ெ] ஏ→[ே] ஐ→[ை] ஒ→[ொ | ெ,ா] ஓ→[ோ | ே,ா] ஔ→[ௌ | ஒ,ௗ] (அ→bare consonant, no cell). Rules per consonant: each vowel-sign combo (composed and decomposed) + (C, ்)→pulli_form. Sheets: S1 uyir+ஃ, S2 consonants, S3 signs, S4 pulli forms, S5–S10 uyirmei (3 consonant-groups × 2 vowel-groups, 6×6 grids), S11 numerals+grantha, S12 digits+punct.
+Data: UYIR 12 (அ0B85 ஆ0B86 இ0B87 ஈ0B88 உ0B89 ஊ0B8A எ0B8E ஏ0B8F ஐ0B90 ஒ0B92 ஓ0B93 ஔ0B94); CONSONANTS 18 (க0B95 ங0B99 ச0B9A ஞ0B9E ட0B9F ண0BA3 த0BA4 ந0BA8 ப0BAA ம0BAE ய0BAF ர0BB0 ல0BB2 வ0BB5 ழ0BB4 ள0BB3 ற0BB1 ன0BA9); SIGNS: ா0BBE ி0BBF ீ0BC0 ு0BC1 ூ0BC2 ெ0BC6 ே0BC7 ை0BC8 ொ0BCA ோ0BCB ௌ0BCC ௗ0BD7 + pulli ்0BCD; VOWEL→SIGN map: ஆ→[ா] இ→[ி] ஈ→[ீ] உ→[ு] ஊ→[ூ] எ→[ெ] ஏ→[ே] ஐ→[ை] ஒ→[ொ | ெ,ா] ஓ→[ோ | ே,ா] ஔ→[ௌ | ஒ,ௗ] (அ→bare consonant, no cell — hence 11 uyirmei per consonant = 198, not 216). Rules per consonant: each vowel-sign combo (composed and decomposed) + (C, ்)→pulli_form = 17×18 = 306. Sheets: S1 uyir+ஃ, S2 consonants, S3 signs, S4 pulli forms, S5–S10 uyirmei (3 consonant-groups × 2 vowel-groups 6+5, three 6×6 + three 6×5 grids), S11 numerals+grantha, S12 digits+punct.
 
-- [ ] Write failing tests: `len(CELLS)==314`; per-kind counts (uyir 12, ayutham 1, consonant 18, sign 13, pulli_form 18, uyirmei 216, numeral 10, grantha 4, digit 10, punct 12); all cps in Tamil/ASCII ranges; `ligature_rules()` == 306, every target gid exists, every sequence non-empty, longest-first order; every codepoint of sample texts resolves via cmap or a full ligature prefix. Run → fail (module missing).
+- [ ] Write failing tests: `len(CELLS)==296`; per-kind counts (uyir 12, ayutham 1, consonant 18, sign 13, pulli_form 18, uyirmei 198, numeral 10, grantha 4, digit 10, punct 12); all cps in Tamil/ASCII ranges; `ligature_rules()` == 306, every target gid exists, every sequence non-empty, longest-first order; every codepoint of sample texts resolves via cmap or a full ligature prefix. Run → fail (module missing).
 - [ ] Implement `mapping.py`. Run tests → pass. Commit.
 
 ### Task 3: `pipeline/gfx.py` — shared rasterizer + image utils
@@ -131,7 +131,7 @@ Manifest: `glyphs/manifest.json` = {gid: {source, mode, preset, ts, history[]}}.
 
 **Files:** `test/test_b1.py` (marked slow).
 
-- [ ] Fixture project: for all 314 cells render source text via gfx (uyirmei: shaped ligature string from ref.ttf) into template-cell geometry → digital sheets → ingest_digital → trace → build → verify. Gates: per-glyph IoU(actual render, source render) ≥ 0.85 (fill fonts, allow antialias margin); shaping identity gates green; 306/306 rules (all glyphs present). Run → pass. Commit.
+- [ ] Fixture project: for all 296 cells render source text via gfx (uyirmei: shaped ligature string from ref.ttf) into template-cell geometry → digital sheets → ingest_digital → trace → build → verify. Gates: per-glyph IoU(actual render, source render) ≥ 0.85 (fill fonts, allow antialias margin); shaping identity gates green; 306/306 rules (all glyphs present). Run → pass. Commit.
 
 ### Task 11: Bootstrap B2 — paper distortion
 
