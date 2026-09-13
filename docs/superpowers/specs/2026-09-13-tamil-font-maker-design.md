@@ -55,17 +55,17 @@ Non-drawn: space (U+0020, advance-only), `.notdef`.
 
 ## 5. Template specification
 
-Generated at 300 dpi as PNG (digital mode) and print-ready PDF (paper mode), A4 portrait. 12 sheets:
+Generated at 300 dpi as PNG (digital mode) and print-ready PDF (paper mode), A4 portrait. **14 sheets** (A4 width fits 5 columns of 400 px, not 6 — grids are 5×5, 25 cells max):
 
 | Sheets | Content | Grid |
 |---|---|---|
-| S1 | uyir + ஃ (13) | loose grid |
+| S1 | uyir + ஃ (13) | 5×3 |
 | S2 | consonants (18) | 5×4 |
-| S3 | signs (13) | loose grid |
+| S3 | signs (13) | 5×3 |
 | S4 | pulli forms (18) | 5×4 |
-| S5–S10 | uyirmei, 198 cells (3 consonant-groups × 2 vowel-groups: three 6×6 + three 6×5) | 6 cols × 6 or 5 rows |
-| S11 | Tamil numerals + grantha (14) | loose grid |
-| S12 | digits + punctuation (22) | 5×5 |
+| S5–S12 | uyirmei, 25 cells each (consonant-major order) | 5×5 (last sheet 5×3) |
+| S13 | Tamil numerals + grantha (14) | 5×3 |
+| S14 | digits + punctuation (22) | 5×5 |
 
 Cell geometry ≈ 400×520 px (≈34×44 mm at print size). Each cell carries:
 

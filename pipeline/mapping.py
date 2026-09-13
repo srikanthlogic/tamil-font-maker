@@ -87,24 +87,19 @@ def _cells() -> list[Cell]:
     add("sign", [_g(cp) for cp in SIGN_CPS], 5, "S3")
     add("pulli_form", [_g(cp, PULLI) for cp in CONSONANTS], 6, "S4")
 
-    # uyirmei: 3 consonant-groups x 2 vowel-groups (6 + 5 vowels) -> S5..S10
-    cons_groups = [CONSONANTS[0:6], CONSONANTS[6:12], CONSONANTS[12:18]]
-    vow_items = list(VOWEL_SIGNS.items())          # preserves declaration order
-    vow_groups = [vow_items[0:6], vow_items[6:11]]  # 6 + 5 vowels
-    sheet_no = 5
-    for cg in cons_groups:
-        for vg in vow_groups:
-            items = []
-            for cv in cg:
-                for vv, options in vg:
-                    items.append(_g(cv, *options[0]))
-            add("uyirmei", items, 6, f"S{sheet_no}")
-            sheet_no += 1
+    # uyirmei: canonical order (consonant-major, vowel-minor), 25 cells per
+    # 5x5 portrait sheet -> S5..S12 (A4 300dpi fits 5 columns of 400px, not 6)
+    uyirmei_items = []
+    for cv in CONSONANTS:
+        for vv, options in VOWEL_SIGNS.items():
+            uyirmei_items.append(_g(cv, *options[0]))
+    for offset in range(0, len(uyirmei_items), 25):
+        add("uyirmei", uyirmei_items[offset:offset + 25], 5, f"S{5 + offset // 25}")
 
-    add("numeral", [_g(cp) for cp in NUMERALS], 5, "S11")
-    add("grantha", [_g(cp) for cp in GRANTHA], 5, "S11")
-    add("digit", [_g(cp) for cp in DIGITS], 5, "S12")
-    add("punct", [_g(cp) for cp in PUNCT], 5, "S12")
+    add("numeral", [_g(cp) for cp in NUMERALS], 5, "S13")
+    add("grantha", [_g(cp) for cp in GRANTHA], 5, "S13")
+    add("digit", [_g(cp) for cp in DIGITS], 5, "S14")
+    add("punct", [_g(cp) for cp in PUNCT], 5, "S14")
     return result
 
 

@@ -30,15 +30,15 @@ def test_sheet_bookkeeping():
     placements = {(c.sheet, c.row, c.col) for c in CELLS}
     assert len(placements) == len(CELLS)
     used_sheets = {c.sheet for c in CELLS}
-    assert used_sheets == {f"S{i}" for i in range(1, 13)}
+    assert used_sheets == {f"S{i}" for i in range(1, 15)}
     uyirmei_sizes = {}
     for c in CELLS:
         if c.kind == "uyirmei":
             key = c.sheet
             uyirmei_sizes[key] = max(uyirmei_sizes.get(key, (0, 0)), (c.row, c.col))
-    # uyirmei sheets: 6 cols; group A (6 vowels) fills 6 rows, group B (5) fills 5
+    # uyirmei sheets: 5 cols; 25 cells per sheet -> max (row, col) = (4, 4)
     for sheet, (row, col) in uyirmei_sizes.items():
-        assert row <= 5 and col <= 5, sheet
+        assert row <= 4 and col <= 4, sheet
 
 
 def test_cmap_fields():
