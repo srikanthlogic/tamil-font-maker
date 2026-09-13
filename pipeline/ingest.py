@@ -104,10 +104,12 @@ def _extract_cells(sheet_img: Image.Image, gids: list[str], threshold: int):
     return artifacts, empty, low
 
 
-def _threshold_for(img: Image.Image, fixed: int | None) -> int:
+def _threshold_for(img: Image.Image, fixed: int | None,
+                   clamp: int | None = OTSU_MAX) -> int:
     if fixed is not None:
         return fixed
-    return min(otsu(img), OTSU_MAX)   # guides (gray 200) must stay background
+    t = otsu(img)
+    return min(t, clamp) if clamp is not None else t
 
 
 def _store(glyphs_dir: Path, artifacts: dict, empty: list, low: list,
@@ -164,7 +166,9 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
     artifacts, empty, low = {}, [], []
     for gid, path in crops.items():
         img = Image.open(Path(path)).convert("L")
-        t = _threshold_for(img, None)
+        # no OTSU clamp here: extract crops have no template guides, and the
+        # clamp would admit mid-gray background as ink
+        t = _threshold_for(img, None, clamp=None)
         a = np.asarray(img)
         binary = Image.fromarray(np.where(a < t, 255, 0).astype(np.uint8), "L")
         binary = despeckle(binary, min_area=_PRESETS[preset]["min_area"])

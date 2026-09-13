@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import build, ingest, template, trace, verify
+from . import backfill, build, ingest, template, trace, verify
 
 STAGE_REPORTS = {"template": "template.json", "ingest": None, "trace": "trace.json",
                  "build": "build.json", "verify": "verify.json"}
@@ -63,6 +63,12 @@ def cmd_ingest_extract(args) -> dict:
     return report
 
 
+def cmd_backfill(args) -> dict:
+    report = backfill.backfill(Path(args.project), args.font)
+    _save_report(args.project, "backfill.json", report)
+    return report
+
+
 def cmd_trace(args) -> dict:
     report = trace.trace(Path(args.project))
     _save_report(args.project, "trace.json", report)
@@ -111,6 +117,12 @@ def main(argv=None):
     s.add_argument("crops", nargs="+", metavar="gid=path")
     s.add_argument("--preset", default="faithful", choices=["faithful", "clean"])
     s.set_defaults(fn=cmd_ingest_extract)
+
+    s = sub.add_parser("backfill")
+    s.add_argument("project")
+    s.add_argument("--font", required=True,
+                   help="base font (e.g. Noto Sans Tamil) for missing cells")
+    s.set_defaults(fn=cmd_backfill)
 
     s = sub.add_parser("trace")
     s.add_argument("project")

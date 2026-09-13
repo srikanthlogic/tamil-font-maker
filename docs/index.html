@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tamil-font-maker — any image → Tamil TTF, fully agentically</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --ink:#e8e6e1; --gold:#d4a94e; --dim:#9a9691; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink); font:16px/1.65 system-ui, sans-serif; }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 24px; }
+  header { padding:64px 0 40px; border-bottom:1px solid #23262e; }
+  h1 { font-size:2.4rem; line-height:1.2; }
+  h1 .ta { color:var(--gold); }
+  .tag { color:var(--dim); margin-top:12px; font-size:1.1rem; }
+  .pill { display:inline-block; background:var(--panel); border:1px solid #2a2e38;
+          border-radius:999px; padding:2px 12px; margin:16px 8px 0 0; font-size:.85rem; color:var(--dim); }
+  section { padding:44px 0; border-bottom:1px solid #23262e; }
+  h2 { font-size:1.4rem; margin-bottom:18px; color:var(--gold); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:22px; }
+  .card { background:var(--panel); border:1px solid #2a2e38; border-radius:12px; padding:20px; }
+  .card h3 { margin-bottom:8px; font-size:1.05rem; }
+  .card p { color:var(--dim); font-size:.95rem; }
+  .card img { width:100%; border-radius:8px; margin:14px 0; background:#fafafa; }
+  .dl { display:inline-block; margin:4px 8px 0 0; padding:6px 14px; border-radius:8px;
+        background:var(--gold); color:#14110b; font-weight:600; text-decoration:none; font-size:.9rem; }
+  .dl.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); }
+  code, pre { font-family:ui-monospace, Menlo, monospace; font-size:.86rem; }
+  pre { background:#0b0d11; border:1px solid #23262e; border-radius:10px; padding:16px;
+        overflow-x:auto; color:#c8d3b8; margin-top:14px; }
+  .typedemo { background:var(--panel); border:1px solid #2a2e38; border-radius:12px; padding:20px; }
+  .typedemo input { width:100%; font-size:1.6rem; padding:12px; border-radius:8px;
+        border:1px solid #2a2e38; background:#0b0d11; color:var(--ink); }
+  @font-face { font-family:'VikramTitle'; src:url('fonts/VikramTitle.woff2') format('woff2'); }
+  @font-face { font-family:'PonniyinSelvanTitle'; src:url('fonts/PonniyinSelvanTitle.woff2') format('woff2'); }
+  .out { font-size:2rem; margin-top:14px; min-height:3.2rem; word-break:break-word; }
+  .out.vikram { font-family:'VikramTitle'; }
+  .out.ps1 { font-family:'PonniyinSelvanTitle'; }
+  .notice { background:#241d12; border:1px solid #59431f; border-radius:10px;
+            padding:14px 18px; font-size:.9rem; color:#d8c9a3; margin-top:18px; }
+  footer { padding:28px 0 60px; color:var(--dim); font-size:.9rem; }
+  a { color:var(--gold); }
+  .steps { counter-reset:s; }
+  .steps li { margin:10px 0 10px 28px; }
+  .steps li::marker { content:counter(s) ". "; counter-increment:s; color:var(--gold); }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>tamil-font-maker <span class="ta">தமிழ் எழுத்து</span></h1>
+  <div class="tag">A ZCode plugin that turns reference imagery into a working Tamil TrueType font —
+  fully agentically. Any image → TTF: posters, signboards, handwriting scans, or drawn template sheets.</div>
+  <span class="pill">296 drawn cells</span><span class="pill">270 GSUB ligature rules</span>
+  <span class="pill">no opencv · no sudo</span><span class="pill">bootstrap-verified B1–B3</span>
+</header>
+
+<section class="wrap">
+  <h2>Two fonts from popular movies — built by this pipeline</h2>
+  <p style="color:var(--dim);margin-bottom:20px">Real cinema posters → agent vision crops & classifies the title
+  lettering → extract pipeline traces it → missing body cells are backfilled from Noto Sans Tamil.
+  The title types in the movie's own lettering; everything else stays fully usable.</p>
+  <div class="cards">
+    <div class="card">
+      <h3>Vikram Title (விக்ரம்)</h3>
+      <p>Vikram (2022) — 4 title glyphs extracted from the theatrical poster, 292 backfilled.</p>
+      <img src="assets/vikram-title-specimen.png" alt="Vikram Title specimen">
+      <a class="dl" href="fonts/VikramTitle.ttf" download>⬇ TTF</a>
+      <a class="dl ghost" href="fonts/VikramTitle.woff2" download>⬇ WOFF2</a>
+    </div>
+    <div class="card">
+      <h3>Ponniyin Selvan Title (பொன்னியின் செல்வன்)</h3>
+      <p>Ponniyin Selvan: Part I (2022) — 8 title glyphs across two title lines, 288 backfilled.</p>
+      <img src="assets/ponniyin-selvan-title-specimen.png" alt="Ponniyin Selvan Title specimen">
+      <a class="dl" href="fonts/PonniyinSelvanTitle.ttf" download>⬇ TTF</a>
+      <a class="dl ghost" href="fonts/PonniyinSelvanTitle.woff2" download>⬇ WOFF2</a>
+    </div>
+  </div>
+  <div class="typedemo" style="margin-top:22px">
+    <h3 style="margin-bottom:10px">Type in the movie fonts (live, via WOFF2)</h3>
+    <input id="ta" value="விக்ரம் பொன்னியின் செல்வன்" spellcheck="false">
+    <div class="out vikram" id="outV"></div>
+    <div class="out ps1" id="outP"></div>
+  </div>
+  <div class="notice"><b>Rights notice.</b> The extracted title letterings belong to their respective
+  film producers and typographers (Raaj Kamal Films International; Madras Talkies / Lyca Productions).
+  These fonts are experimental demos of the pipeline, for personal and educational use only —
+  do not redistribute or use commercially. Issues will be honored with immediate takedown.</div>
+</section>
+
+<section class="wrap">
+  <h2>How it works</h2>
+  <div class="cards">
+    <div class="card"><h3>1 · template</h3><p>Generates 14 A4/300dpi sheets covering 296 cells —
+      12 uyir + ஃ + 18 consonants + 13 signs + 18 pulli forms + 198 uyirmei + numerals, grantha,
+      digits, punctuation — with in-cell baseline/headline guides and corner fiducials.</p></div>
+    <div class="card"><h3>2 · ingest (3 modes)</h3><p>Digital sheets (exact-geometry crop), paper photos
+      (numpy fiducial detection + perspective warp — no opencv), or agent-vision extraction from arbitrary
+      images: the agent crops, classifies by reading, and picks faithful/clean cleanup presets.</p></div>
+    <div class="card"><h3>3 · trace → build</h3><p>potrace → cu2qu → 2048-upm TrueType via fonttools,
+      with the 270 ligature rules generated from one mapping table. Precomposed uyirmei sidestep
+      matra reordering entirely. Lookups registered under ccmp + liga (HarfBuzz's Tamil shaper
+      ignores plain liga — found empirically).</p></div>
+    <div class="card"><h3>4 · verify (agent QA)</h3><p>Programmatic gates: non-empty rasters, em-bounds,
+      shaping identities (கி → one glyph; composed == decomposed கௌ), notdefs vs coverage. Visual gates:
+      HarfBuzz-rendered charts and per-glyph comparisons the agent inspects by eye, then iterates
+      per-cell parameters or flags redraws.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Bootstrap-proven, not just plausible</h2>
+  <p style="color:var(--dim)">Before any human art, the test suite rasterizes Noto Sans Tamil into the
+  pipeline's own formats and gates the full roundtrip: <b>B1</b> digital sheets (296/296 traced,
+  270/270 rules, per-glyph IoU), <b>B2</b> synthesized phone photos (perspective ≤ 70 px jitter, noise,
+  uneven light → fiducial deskew), <b>B3</b> poster-like extraction with occlusion flagging and
+  partial-font degradation. 40/40 tests green.</p>
+</section>
+
+<section class="wrap">
+  <h2>Use it</h2>
+<pre>$ git clone https://github.com/srikanthlogic/tamil-font-maker && cd tamil-font-maker
+$ python3 -m venv --without-pip .venv
+$ pip3 --python .venv/bin/python install fonttools uharfbuzz potracer cu2qu Pillow brotli pytest
+$ .venv/bin/python -m pipeline.cli init projects/myfont --family "My Font"
+$ .venv/bin/python -m pipeline.cli template projects/myfont   # draw the sheets, or drop images in samples/
+$ .venv/bin/python -m pipeline.cli ingest-digital projects/myfont sheets/S1.png
+$ .venv/bin/python -m pipeline.cli ingest-extract projects/myfont g_u0BB5=crops/ka.png --preset faithful
+$ .venv/bin/python -m pipeline.cli trace projects/myfont && \
+  .venv/bin/python -m pipeline.cli build projects/myfont && \
+  .venv/bin/python -m pipeline.cli verify projects/myfont</pre>
+  <p style="margin-top:14px;color:var(--dim)">The full agent protocol lives in
+  <code>skills/tamil-font-maker/SKILL.md</code>. Partial fonts degrade legibly (spacing matras),
+  and <code>template --only …</code> emits completion sheets for exactly the missing cells —
+  or <code>backfill</code> completes them from any base font, as these two movie fonts did.</p>
+</section>
+
+<footer class="wrap">
+  Code: MIT. Extracted lettering: see the rights notice above.
+  Built with ZCode · HarfBuzz · fonttools · potrace · Noto Sans Tamil (OFL).
+</footer>
+
+<script>
+const inp = document.getElementById('ta');
+const show = () => {
+  document.getElementById('outV').textContent = inp.value;
+  document.getElementById('outP').textContent = inp.value;
+};
+inp.addEventListener('input', show); show();
+</script>
+</body>
+</html>
