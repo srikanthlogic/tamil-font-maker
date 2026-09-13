@@ -2,4 +2,5 @@
 projects/
 __pycache__/
 *.pyc
-test/fixtures/*.ttf
+.mimosa/
+.pytest_cache/
