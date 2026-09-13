@@ -83,9 +83,9 @@ def _cells() -> list[Cell]:
 
     add("uyir", [_g(cp) for cp in UYIR], 5, "S1")
     add("ayutham", [_g(AYUTHAM)], 5, "S1")
-    add("consonant", [_g(cp) for cp in CONSONANTS], 6, "S2")
+    add("consonant", [_g(cp) for cp in CONSONANTS], 5, "S2")
     add("sign", [_g(cp) for cp in SIGN_CPS], 5, "S3")
-    add("pulli_form", [_g(cp, PULLI) for cp in CONSONANTS], 6, "S4")
+    add("pulli_form", [_g(cp, PULLI) for cp in CONSONANTS], 5, "S4")
 
     # uyirmei: canonical order (consonant-major, vowel-minor), 25 cells per
     # 5x5 portrait sheet -> S5..S12 (A4 300dpi fits 5 columns of 400px, not 6)

@@ -16,7 +16,7 @@ from .template import BASELINE_Y, HEADLINE_Y
 GUIDE_PX = BASELINE_Y - HEADLINE_Y     # 320 px between guides
 EM_ASCENT = 1400                       # units from baseline to headline (2048 upm)
 SCALE = EM_ASCENT / GUIDE_PX           # em units per pixel
-CU2QU_ERR = 4.0                        # ~1 px in em units
+CU2QU_ERR = 2.0                        # ~0.5 px in em units (finer quad fit)
 RSB_FLOOR = 80
 
 
@@ -80,8 +80,8 @@ def _reverse(c):
     c["poly"] = list(reversed(c["poly"]))
 
 
-def trace_glyph_raster(arr: np.ndarray, turdsize: int = 10,
-                       alphamax: float = 1.0) -> dict:
+def trace_glyph_raster(arr: np.ndarray, turdsize: int = 4,
+                       alphamax: float = 0.8) -> dict:
     """arr: L-mode raster (ink=255). Returns contours with quadratic segs.
 
     Note: potracer traces the *background* of the array it is given, so the
@@ -98,16 +98,20 @@ def trace_glyph_raster(arr: np.ndarray, turdsize: int = 10,
         cur = start
         for seg in curve.segments:
             if seg.is_corner:
+                # potrace corner segment: path bends at seg.c, then runs to
+                # end_point — both are real outline vertices
+                cpt = _pt(seg.c)
                 e = _pt(seg.end_point)
+                segs.append({"l": [cpt[0], cpt[1]]})
                 segs.append({"l": [e[0], e[1]]})
-                poly += [e]
+                poly += [cpt, e]
                 cur = e
             else:
                 c1, c2 = _pt(seg.c1), _pt(seg.c2)
                 e = _pt(seg.end_point)
                 pts = curve_to_quadratic((cur, c1, c2, e), CU2QU_ERR)
                 # cu2qu returns a flat [p0, ctrl, on, ctrl, on, ...] list
-                for i in range(1, len(pts), 2):
+                for i in range(1, len(pts) - 1, 2):
                     c, p1 = pts[i], pts[i + 1]
                     segs.append({"q": [c[0], c[1], p1[0], p1[1]]})
                     poly += _flatten_quad(pts[i - 1], c, p1)

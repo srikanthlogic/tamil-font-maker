@@ -119,7 +119,7 @@ def build(project: Path) -> dict:
     except ImportError:
         woff2 = False
 
-    covered = len(cmap) - 1  # minus space
+    covered = len(order_cells)   # all drawn glyphs (incl. ligature-only cells)
     return {"family": family, "ttf": str(ttf_path), "woff2": woff2,
             "glyphs": len(glyph_order) - 2, "coverage": covered,
             "coverage_pct": round(100 * covered / (len(CELLS)), 1),

@@ -23,9 +23,10 @@ WORK_H = CELL_H - 2 * WORK_INSET          # 480
 BASELINE_IN_RASTER = BASELINE_Y - WORK_INSET   # 400
 HEADLINE_IN_RASTER = HEADLINE_Y - WORK_INSET   # 80
 
-DIGITAL_THRESHOLD = 170   # template grays: guides 200 stay background
+DIGITAL_THRESHOLD = 190   # template grays: guides (200) stay background,
+                          # antialiased ink edges are kept (less thinning)
 OTSU_MAX = 170            # clamp for paper: guides must stay background
-EMPTY_INK_FRAC = 0.005
+EMPTY_INK_FRAC = 0.0015   # small punctuation (~300 px) must still register
 LOW_INK_FRAC = 0.02
 
 
