@@ -1,0 +1,8 @@
+{
+  "name": "tamil-font-maker",
+  "version": "0.1.0",
+  "description": "Calligraphr-for-Tamil: turn reference imagery (template sheets, paper scans, or arbitrary images with Tamil lettering) into a working TrueType font through an agent-driven pipeline (template → ingest → trace → build → verify) with shaping gates and visual QA.",
+  "author": { "name": "logic" },
+  "license": "MIT",
+  "skills": "skills"
+}

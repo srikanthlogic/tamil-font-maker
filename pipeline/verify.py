@@ -13,7 +13,7 @@ from .gfx import render_text
 from .mapping import CELLS, ligature_rules
 
 EM_MIN, EM_MAX = -600, 2600     # generous em-box bounds (guides: 0..1400)
-CHART_PX = 72
+CHART_PX = 96
 SAMPLE_TEXTS = [
     "தமிழ் எழுத்துக் கலை.",
     "ஆண்டு 2026 ஆகும்.",
@@ -116,7 +116,8 @@ def _visual_artifacts(font_path: Path, project: Path, glyphs_dir: Path) -> list[
                 x = (i % cols) * cw + 8
                 y = (i // cols) * ch + 8
                 img.paste(0, (x, y, x + g.width, y + g.height),
-                          mask=Image.fromarray(np.where(np.array(g) > 127, 255, 0)))
+                          mask=Image.fromarray(
+                              np.where(np.array(g) > 127, 255, 0).astype(np.uint8)))
             except Exception:  # noqa: BLE001 — a broken cell must not kill the chart
                 pass
             d.text(((i % cols) * cw + 4, (i // cols) * ch + CHART_PX + 10),
@@ -160,7 +161,7 @@ def _visual_artifacts(font_path: Path, project: Path, glyphs_dir: Path) -> list[
                     ren = ren.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
                 ren.thumbnail((cw - 10, ch - 10))
                 img.paste(ren, (i * cw + 5, ch + 15))
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 — one bad cell must not kill the sheet
                 pass
         img.save(qa / "compare_first25.png")
         made.append("qa/compare_first25.png")

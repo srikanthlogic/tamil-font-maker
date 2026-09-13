@@ -46,9 +46,9 @@ def test_circle_geometry():
 def test_square_is_quad():
     out = trace_glyph_raster(np.array(_square_raster()))
     contour = out["contours"][0]
-    # a square traces to 4 corners: poly has 4 line segments (first point dup)
+    # a square traces to 4 corner segments; each emits vertex + endpoint
     pts = contour["poly"]
-    assert 4 <= len(pts) <= 6
+    assert 8 <= len(pts) <= 10
     scale = EM_ASCENT / GUIDE_PX
     assert abs(out["ymax"] - 160 * scale) < 15
 
