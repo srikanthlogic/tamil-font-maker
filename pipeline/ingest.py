@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -153,8 +154,8 @@ def ingest_paper(project: Path, photo_path: Path, sheet: str,
 
 
 _PRESETS = {
-    "faithful": {"min_area": 4, "threshold": None},
-    "clean": {"min_area": 24, "threshold": None},
+    "faithful": {"min_area": 30, "threshold": None},
+    "clean": {"min_area": 80, "threshold": None},
 }
 
 
@@ -163,17 +164,48 @@ def ingest_extract(project: Path, crops: dict[str, Path], preset: str,
     if preset not in _PRESETS:
         raise IngestError(f"unknown preset {preset!r}")
     glyphs_dir = _glyphs_dir(project, glyphs_dir)
-    artifacts, empty, low = {}, [], []
+    cleaned: dict[str, Image.Image] = {}
     for gid, path in crops.items():
         img = Image.open(Path(path)).convert("L")
         # no OTSU clamp here: extract crops have no template guides, and the
         # clamp would admit mid-gray background as ink
         t = _threshold_for(img, None, clamp=None)
         a = np.asarray(img)
-        binary = Image.fromarray(np.where(a < t, 255, 0).astype(np.uint8), "L")
+        # polarity auto-detect: posters carry light lettering on dark ground
+        # as often as the reverse. Background always touches the crop borders
+        # extensively; letter ink mostly does not — pick the polarity whose
+        # ink has the LOWER border-contact ratio.
+        def _border_contact(mask):
+            b = np.zeros_like(mask)
+            b[0, :] = b[-1, :] = b[:, 0] = b[:, -1] = True
+            return (mask & b).sum() / max(b.sum(), 1)
+
+        dark = a < t
+        light = ~dark
+        polarity = dark if _border_contact(dark) <= _border_contact(light) \
+            else light
+        binary = Image.fromarray(np.where(polarity, 255, 0).astype(np.uint8), "L")
         binary = despeckle(binary, min_area=_PRESETS[preset]["min_area"])
-        normalized = fit_to_box(binary, (WORK_W, WORK_H),
+        cleaned[gid] = binary
+
+    # No batch size normalization here: natural letter heights DIFFER
+    # (ஃ is short, combos tall) and forcing a median distorts them. Size
+    # consistency is the crop stage's job — cut equal-height boxes for
+    # letters that share an optical height.
+    artifacts, empty, low = {}, [], []
+    for gid in crops:
+        binary = cleaned[gid]
+        m = np.asarray(binary) > 127
+        if not m.any():
+            empty.append(gid)
+            continue
+        ys, xs = np.nonzero(m)
+        ink = binary.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+        normalized = fit_to_box(ink, (WORK_W, WORK_H),
                                 anchor_baseline_frac=BASELINE_IN_RASTER / WORK_H)
+        frac = m.mean()
+        if frac < LOW_INK_FRAC:
+            low.append(gid)
         artifacts[gid] = normalized
     report = _store(glyphs_dir, artifacts, empty, low, "extract", "", preset)
     return report
