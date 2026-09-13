@@ -116,7 +116,7 @@ fontTools TTF assembly: glyf (quadratic outlines), cmap (direct-mapped glyphs; *
 
 - Script/lang: `taml` / dflt.
 - Feature: `liga` (registration validated empirically in bootstrap B1; if an engine path needs `ccmp`, lookups are additionally registered there — decision procedure, not a guess).
-- Ligature rules, generated from mapping.py: per consonant — 11 matra rules (ா ி ீ ு ூ ெ ே ை ொ ோ ௌ) + 2 rules for ஔ (both (C, U+0B94) as a 2-glyph ligature and (C, U+0B92, U+0BD7) as a 3-glyph ligature, mapping to the same precomposed cell — NFC decomposition path) = 13 × 18 = 234 uyirmei rules, plus 18 × (C, ்) pulli rules = **252 rules total**.
+- Ligature rules, generated from mapping.py: per consonant — 8 simple matra rules (ா ி ீ ு ூ ெ ே ை) + 8 rules covering the split signs and ஔ in both composed and NFC-decomposed form: (C,ொ)+(C,ெ,ா), (C,ோ)+(C,ே,ா), (C,ௌ)+(C,ெ,ௗ), (C,ஔ)+(C,ஒ,ௗ) = 16 uyirmei rules, plus 1 × (C, ்) pulli rule = 17 × 18 = **306 rules total**. (Decomposed forms matter because text may arrive as க+ெ+ா instead of க+ொ; both must ligate to the same precomposed cell.)
 - **Rules are emitted only for glyphs that exist** in `outlines/`.
 - WOFF2 if `brotli` is importable, skipped otherwise.
 
@@ -178,7 +178,7 @@ All three green = the pipeline is proven fully agentically; real user art then r
 
 ## 12. Testing strategy
 
-pytest unit tests: mapping-table completeness (counts and codepoints vs §4 tables — the table is literally checked against the spec), homography math, fiducial detector on fixtures, cell extraction, tracer on synthetic shapes (circle → known area tolerance), GSUB rule generation (252 rules, including the 18 dual-form ஔ variants), build smoke (TTF parses, tables present). Integration: B1–B3.
+pytest unit tests: mapping-table completeness (counts and codepoints vs §4 tables — the table is literally checked against the spec), homography math, fiducial detector on fixtures, cell extraction, tracer on synthetic shapes (circle → known area tolerance), GSUB rule generation (306 rules, including decomposed-form variants for ொ ோ ௌ ஔ), build smoke (TTF parses, tables present). Integration: B1–B3.
 
 ## 13. Project layout
 
