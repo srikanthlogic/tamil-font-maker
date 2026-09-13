@@ -4,7 +4,7 @@
 
 **Goal:** Build the `tamil-font-maker` ZCode plugin + Python pipeline that turns reference imagery (template sheets or arbitrary images) into a valid Tamil TTF, verified by the B1–B3 bootstrap suite with zero human-drawn art.
 
-**Architecture:** Deterministic stage pipeline (template → ingest → trace → build → verify) behind one CLI (`python -m pipeline <stage>`), all state per-project; `mapping.py` is the single source of truth for the 296-cell glyph set and 306 GSUB rules. A shared rasterizer (uharfbuzz shaping + fontTools outline → XOR-filled polygons) powers fixtures, verify renders, and pixel-diff gates. The plugin skill makes the agent the orchestrator/QA driver.
+**Architecture:** Deterministic stage pipeline (template → ingest → trace → build → verify) behind one CLI (`python -m pipeline <stage>`), all state per-project; `mapping.py` is the single source of truth for the 296-cell glyph set and 270 GSUB rules. A shared rasterizer (uharfbuzz shaping + fontTools outline → XOR-filled polygons) powers fixtures, verify renders, and pixel-diff gates. The plugin skill makes the agent the orchestrator/QA driver.
 
 **Tech Stack:** Python 3.14 (venv), fonttools 4.61 (+ feaLib, otlLib, cu2qu), Pillow, numpy, potracer, uharfbuzz, brotli (optional). No opencv — fiducials + homography in numpy.
 
@@ -15,7 +15,7 @@
 - Python 3.14 venv at `.venv/`; deps: `fonttools uharfbuzz potracer brotli` (+ pytest). No opencv, no fontforge, no system packages.
 - UPM 2048; guides: baseline→0, headline→1400 units; cell 400×520 px; working raster 320×416.
 - Glyph naming: `g_<hex>[_<hex>…]` e.g. `g_u0B95_u0BBF`; FEA-safe (letters/digits/underscore only). Not `u0B95` alone (add `g_` prefix to avoid reserved-name ambiguity).
-- GSUB: script `taml`, feature `liga`, 306 rules generated from mapping (spec §6.4 as corrected: 16 uyirmei + 1 pulli per consonant × 18). Rules emitted only for glyphs present.
+- GSUB: script `taml`, feature `liga`, 270 rules generated from mapping (spec §6.4 as corrected: 14 uyirmei + 1 pulli per consonant × 18). Rules emitted only for glyphs present.
 - Sheet fiducials: 60 px black squares, 20 px white ring, centers 100 px from each corner.
 - Every stage: CLI subcommand, idempotent, JSON report to `projects/<name>/reports/`.
 - Reports and tests must never contain credentials (none needed).
@@ -48,12 +48,12 @@ class Cell:
     cmap_cp: int | None # direct cmap mapping (None for pulli_form/uyirmei)
 CELLS: tuple[Cell, ...]            # exactly 296
 def cell(gid) -> Cell
-def ligature_rules() -> list[tuple[tuple[int,...], str]]  # 306 (seq -> gid), sorted longest-first
+def ligature_rules() -> list[tuple[tuple[int,...], str]]  # 270 (seq -> gid), sorted longest-first
 SAMPLE_TEXTS: list[str]            # test sentences for verify
 ```
-Data: UYIR 12 (அ0B85 ஆ0B86 இ0B87 ஈ0B88 உ0B89 ஊ0B8A எ0B8E ஏ0B8F ஐ0B90 ஒ0B92 ஓ0B93 ஔ0B94); CONSONANTS 18 (க0B95 ங0B99 ச0B9A ஞ0B9E ட0B9F ண0BA3 த0BA4 ந0BA8 ப0BAA ம0BAE ய0BAF ர0BB0 ல0BB2 வ0BB5 ழ0BB4 ள0BB3 ற0BB1 ன0BA9); SIGNS: ா0BBE ி0BBF ீ0BC0 ு0BC1 ூ0BC2 ெ0BC6 ே0BC7 ை0BC8 ொ0BCA ோ0BCB ௌ0BCC ௗ0BD7 + pulli ்0BCD; VOWEL→SIGN map: ஆ→[ா] இ→[ி] ஈ→[ீ] உ→[ு] ஊ→[ூ] எ→[ெ] ஏ→[ே] ஐ→[ை] ஒ→[ொ | ெ,ா] ஓ→[ோ | ே,ா] ஔ→[ௌ | ஒ,ௗ] (அ→bare consonant, no cell — hence 11 uyirmei per consonant = 198, not 216). Rules per consonant: each vowel-sign combo (composed and decomposed) + (C, ்)→pulli_form = 17×18 = 306. Sheets: S1 uyir+ஃ, S2 consonants, S3 signs, S4 pulli forms, S5–S10 uyirmei (3 consonant-groups × 2 vowel-groups 6+5, three 6×6 + three 6×5 grids), S11 numerals+grantha, S12 digits+punct.
+Data: UYIR 12 (அ0B85 ஆ0B86 இ0B87 ஈ0B88 உ0B89 ஊ0B8A எ0B8E ஏ0B8F ஐ0B90 ஒ0B92 ஓ0B93 ஔ0B94); CONSONANTS 18 (க0B95 ங0B99 ச0B9A ஞ0B9E ட0B9F ண0BA3 த0BA4 ந0BA8 ப0BAA ம0BAE ய0BAF ர0BB0 ல0BB2 வ0BB5 ழ0BB4 ள0BB3 ற0BB1 ன0BA9); SIGNS: ா0BBE ி0BBF ீ0BC0 ு0BC1 ூ0BC2 ெ0BC6 ே0BC7 ை0BC8 ொ0BCA ோ0BCB ௌ0BCC ௗ0BD7 + pulli ்0BCD; VOWEL→SIGN map: ஆ→[ா] இ→[ி] ஈ→[ீ] உ→[ு] ஊ→[ூ] எ→[ெ] ஏ→[ே] ஐ→[ை] ஒ→[ொ | ெ,ா] ஓ→[ோ | ே,ா] ஔ→[ௌ | ெ,ௗ] (அ→bare consonant, no cell — hence 11 uyirmei per consonant = 198, not 216). Rules per consonant: each vowel-sign combo (composed and decomposed) + (C, ்)→pulli_form = 15×18 = 270. Sheets: S1 uyir+ஃ, S2 consonants, S3 signs, S4 pulli forms, S5–S10 uyirmei (3 consonant-groups × 2 vowel-groups 6+5, three 6×6 + three 6×5 grids), S11 numerals+grantha, S12 digits+punct.
 
-- [ ] Write failing tests: `len(CELLS)==296`; per-kind counts (uyir 12, ayutham 1, consonant 18, sign 13, pulli_form 18, uyirmei 198, numeral 10, grantha 4, digit 10, punct 12); all cps in Tamil/ASCII ranges; `ligature_rules()` == 306, every target gid exists, every sequence non-empty, longest-first order; every codepoint of sample texts resolves via cmap or a full ligature prefix. Run → fail (module missing).
+- [ ] Write failing tests: `len(CELLS)==296`; per-kind counts (uyir 12, ayutham 1, consonant 18, sign 13, pulli_form 18, uyirmei 198, numeral 10, grantha 4, digit 10, punct 12); all cps in Tamil/ASCII ranges; `ligature_rules()` == 270, every target gid exists, every sequence non-empty, longest-first order; every codepoint of sample texts resolves via cmap or a full ligature prefix. Run → fail (module missing).
 - [ ] Implement `mapping.py`. Run tests → pass. Commit.
 
 ### Task 3: `pipeline/gfx.py` — shared rasterizer + image utils
@@ -131,7 +131,7 @@ Manifest: `glyphs/manifest.json` = {gid: {source, mode, preset, ts, history[]}}.
 
 **Files:** `test/test_b1.py` (marked slow).
 
-- [ ] Fixture project: for all 296 cells render source text via gfx (uyirmei: shaped ligature string from ref.ttf) into template-cell geometry → digital sheets → ingest_digital → trace → build → verify. Gates: per-glyph IoU(actual render, source render) ≥ 0.85 (fill fonts, allow antialias margin); shaping identity gates green; 306/306 rules (all glyphs present). Run → pass. Commit.
+- [ ] Fixture project: for all 296 cells render source text via gfx (uyirmei: shaped ligature string from ref.ttf) into template-cell geometry → digital sheets → ingest_digital → trace → build → verify. Gates: per-glyph IoU(actual render, source render) ≥ 0.85 (fill fonts, allow antialias margin); shaping identity gates green; 270/270 rules (all glyphs present). Run → pass. Commit.
 
 ### Task 11: Bootstrap B2 — paper distortion
 

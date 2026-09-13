@@ -116,7 +116,7 @@ fontTools TTF assembly: glyf (quadratic outlines), cmap (direct-mapped glyphs; *
 
 - Script/lang: `taml` / dflt.
 - Feature: `liga` (registration validated empirically in bootstrap B1; if an engine path needs `ccmp`, lookups are additionally registered there — decision procedure, not a guess).
-- Ligature rules, generated from mapping.py: per consonant — 8 simple matra rules (ா ி ீ ு ூ ெ ே ை) + 8 rules covering the split signs and ஔ in both composed and NFC-decomposed form: (C,ொ)+(C,ெ,ா), (C,ோ)+(C,ே,ா), (C,ௌ)+(C,ெ,ௗ), (C,ஔ)+(C,ஒ,ௗ) = 16 uyirmei rules, plus 1 × (C, ்) pulli rule = 17 × 18 = **306 rules total**. (Decomposed forms matter because text may arrive as க+ெ+ா instead of க+ொ; both must ligate to the same precomposed cell.)
+- Ligature rules, generated from mapping.py: per consonant — 8 simple matra rules (ா ி ீ ு ூ ெ ே ை) + 6 rules covering the split signs in composed and NFC-decomposed form: (C,ொ)+(C,ெ,ா), (C,ோ)+(C,ே,ா), (C,ௌ)+(C,ெ,ௗ) = 14 uyirmei rules, plus 1 × (C, ்) pulli rule = 15 × 18 = **270 rules total**. (Decomposed forms matter because text may arrive as க+ெ+ா instead of க+ொ; both must ligate to the same precomposed cell. C + independent-vowel sequences like க+ஔ are intentionally not ligated — the independent vowel never follows a consonant in canonical Tamil, and real fonts render such input as two glyphs.)
 - **Rules are emitted only for glyphs that exist** in `outlines/`.
 - WOFF2 if `brotli` is importable, skipped otherwise.
 
@@ -178,7 +178,7 @@ All three green = the pipeline is proven fully agentically; real user art then r
 
 ## 12. Testing strategy
 
-pytest unit tests: mapping-table completeness (counts and codepoints vs §4 tables — the table is literally checked against the spec), homography math, fiducial detector on fixtures, cell extraction, tracer on synthetic shapes (circle → known area tolerance), GSUB rule generation (306 rules, including decomposed-form variants for ொ ோ ௌ ஔ), build smoke (TTF parses, tables present). Integration: B1–B3.
+pytest unit tests: mapping-table completeness (counts and codepoints vs §4 tables — the table is literally checked against the spec), homography math, fiducial detector on fixtures, cell extraction, tracer on synthetic shapes (circle → known area tolerance), GSUB rule generation (270 rules, including decomposed-form variants for ொ ோ ௌ), build smoke (TTF parses, tables present). Integration: B1–B3.
 
 ## 13. Project layout
 
